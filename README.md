@@ -5,6 +5,9 @@
 соответствия, статья. От темы шаблон не зависит: всё тематическое лежит в двух файлах
 нового проекта, `question.md` и `PROJECT.md`.
 
+Порядок работы и возможности проекта для нового пользователя описаны в
+[GUIDE.md](GUIDE.md).
+
 ## Новый проект
 
 ```
@@ -37,8 +40,7 @@ python create.py --update ..\Spectra
 
 Python 3.11 или новее, `uv`, `elan` с `lake`, `git`; `pdflatex` — для статьи и проверки
 транскрипций. Серверы MCP из `.mcp.json` запускаются через `uv` и ставят свои зависимости
-сами. Скилл `math-rigor` (набор и типографика LaTeX) берётся из аккаунта пользователя:
-в шаблон он не входит.
+сами.
 
 ## Что входит
 
@@ -50,7 +52,7 @@ Python 3.11 или новее, `uv`, `elan` с `lake`, `git`; `pdflatex` — д�
 | `template/scripts/*_mcp.py` | те же действия как инструменты MCP-серверов `proj` и `lit` |
 | `template/.claude/agents/` | генератор идей, критик, экспериментатор, рецензент, формализатор, проверяющий соответствие, поиск по Mathlib, поиск литературы, транскрипция PDF, сверка карточек |
 | `template/.claude/commands/` | `/day`, `/ideas`, `/referee`, `/formalize`, `/fidelity`, `/sources`, `/transcribe` |
-| `template/.claude/skills/` | оформление текста: `paper-canvas`, `shkalikov-style`, `paper-de-ai`, `exposition` |
+| `template/.claude/skills/` | оформление текста: `paper-canvas`, `shkalikov-style`, `paper-de-ai`, `exposition`; набор и типографика LaTeX: `math-rigor` |
 | `template/tests/` | тесты инструментов без сети и без Lean |
 
 ## Устройство
