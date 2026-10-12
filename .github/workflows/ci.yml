@@ -1,0 +1,38 @@
+name: Template tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tooling:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.14']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -X utf8 -m unittest discover -s template/tests
+      - run: python -X utf8 -m unittest discover -s tests
+
+  harness-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python template/scripts/harness.py prepare
+      - run: npm install --prefix "$RUNNER_TEMP/research-dsh" "$(python template/scripts/harness.py package)"
+      - run: node template/tests/harness_runtime.mjs "$RUNNER_TEMP/research-dsh/node_modules"

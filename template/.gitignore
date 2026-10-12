@@ -2,6 +2,7 @@
 output/
 __pycache__/
 .claude/settings.local.json
+.dsh/skills/
 
 # Промежуточные файлы LaTeX
 *.aux

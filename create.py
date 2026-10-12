@@ -21,13 +21,14 @@ from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent / 'template'
 # Файлы, которыми владеет шаблон: обновление переписывает их в проекте
-TOOLING = ['AGENTS.md', 'CLAUDE.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
+TOOLING = ['AGENTS.md', 'CLAUDE.md', 'DEEPSEEK.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
            '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml']
-SKIP = {'__pycache__'}
+SKIP = {'__pycache__', '.git', '.dsh', 'output', '.lake'}
 
 
 def files() -> list[Path]:
-    return sorted(path for path in TEMPLATE.rglob('*') if path.is_file() and not SKIP & set(path.parts))
+    return sorted(path for path in TEMPLATE.rglob('*')
+                  if path.is_file() and not SKIP & set(path.relative_to(TEMPLATE).parts))
 
 
 def render(data: bytes, lib: str, title: str) -> bytes:
@@ -36,6 +37,11 @@ def render(data: bytes, lib: str, title: str) -> bytes:
     except UnicodeDecodeError:
         return data
     return text.replace('__LIB__', lib).replace('__TITLE__', title).encode('utf-8')
+
+
+def prepare_harness(target: Path) -> None:
+    subprocess.run([sys.executable, str(target / 'scripts/harness.py'), 'prepare'],
+                   cwd=target, check=True)
 
 
 def create(target: Path, lib: str, title: str, pins: Path | None, git: bool) -> None:
@@ -63,11 +69,13 @@ def create(target: Path, lib: str, title: str, pins: Path | None, git: bool) -> 
         subprocess.run(['git', 'init', '--quiet'], cwd=target, check=False)
     # Сводки собираются сразу, чтобы первая проверка проекта прошла
     subprocess.run([sys.executable, 'scripts/proj.py', 'sync'], cwd=target, check=False, capture_output=True)
+    prepare_harness(target)
     print(f'Проект создан: {target}\n\nДальше, из папки проекта:\n'
           '  lake exe cache get                  # готовая сборка Mathlib\n'
           '  lake build\n'
           '  python scripts/proj.py doctor       # окружение\n'
           '  python scripts/proj.py check        # одно замечание о примере R01\n'
+          '  python scripts/harness.py run web   # DeepSeek Harness\n'
           'Затем заполните question.md и PROJECT.md; остальное — в README.md проекта.')
 
 
@@ -80,7 +88,7 @@ def update(target: Path, dry: bool) -> None:
             continue
         data = render(source.read_bytes(), config['lib'], config.get('title', ''))
         destination = target / relative
-        if not destination.exists() or destination.read_bytes().replace(b'\r\n', b'\n') != data:
+        if not destination.exists() or destination.read_bytes().replace(b'\r\n', b'\n') != data.replace(b'\r\n', b'\n'):
             changed.append(relative)
             if not dry:
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -90,13 +98,18 @@ def update(target: Path, dry: bool) -> None:
     known = {source.relative_to(TEMPLATE).as_posix() for source in files()}
     extra = sorted(
         relative for folder in ('scripts', 'tests', '.claude/agents', '.claude/commands', '.claude/skills')
-        for path in (target / folder).rglob('*') if path.is_file() and not SKIP & set(path.parts)
+        for path in (target / folder).rglob('*')
+        if path.is_file() and not SKIP & set(path.relative_to(target).parts)
         for relative in [path.relative_to(target).as_posix()] if relative not in known)
     if extra:
         print('Есть в проекте, но не в шаблоне (свои или устаревшие; не удаляются):')
         print('\n'.join('  ' + name for name in extra))
     if changed and not dry:
         print('Проверьте: python -m unittest discover tests; python scripts/proj.py check --fast')
+    if not dry:
+        prepare_harness(target)
+    else:
+        print('После обновления будут пересобраны .dsh/skills/ и output/harness/ из локальной .mcp.json.')
 
 
 def main() -> None:
