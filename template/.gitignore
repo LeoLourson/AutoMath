@@ -1,0 +1,17 @@
+.lake/
+output/
+__pycache__/
+.claude/settings.local.json
+
+# Промежуточные файлы LaTeX
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.log
+
+# Ключи доступа
+.env
+.env.*
+!.env.example

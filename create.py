@@ -1,0 +1,122 @@
+"""Новый исследовательский проект из template/ или обновление инструментов в существующем.
+
+    python create.py ПАПКА --lib Spectra --title "Название темы" [--pins-from ПРОЕКТ] [--no-git]
+    python create.py --update ПРОЕКТ [--dry-run]
+
+Создание копирует весь шаблон и подставляет имя библиотеки и название. Обновление
+переписывает только инструменты (правила, скрипты, агентов, команды, тесты); постановка,
+записи, идеи, источники, библиотека Lean и статья не трогаются.
+"""
+from __future__ import annotations
+
+import argparse
+import fnmatch
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+from pathlib import Path
+
+TEMPLATE = Path(__file__).resolve().parent / 'template'
+# Файлы, которыми владеет шаблон: обновление переписывает их в проекте
+TOOLING = ['AGENTS.md', 'CLAUDE.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
+           '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml']
+SKIP = {'__pycache__'}
+
+
+def files() -> list[Path]:
+    return sorted(path for path in TEMPLATE.rglob('*') if path.is_file() and not SKIP & set(path.parts))
+
+
+def render(data: bytes, lib: str, title: str) -> bytes:
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        return data
+    return text.replace('__LIB__', lib).replace('__TITLE__', title).encode('utf-8')
+
+
+def create(target: Path, lib: str, title: str, pins: Path | None, git: bool) -> None:
+    if not re.fullmatch(r'[A-Z][A-Za-z0-9]*', lib):
+        raise SystemExit('Имя библиотеки — идентификатор Lean с заглавной буквы, без пробелов: Spectra, NonlocalOps.')
+    if target.exists() and any(target.iterdir()):
+        raise SystemExit(f'Папка {target} не пуста.')
+    for source in files():
+        relative = Path(str(source.relative_to(TEMPLATE)).replace('__LIB__', lib))
+        (target / relative).parent.mkdir(parents=True, exist_ok=True)
+        (target / relative).write_bytes(render(source.read_bytes(), lib, title))
+    if pins:
+        # Версии Lean и Mathlib берутся из работающего проекта, а не из шаблона
+        for name in ('lean-toolchain', 'lake-manifest.json'):
+            shutil.copy2(pins / name, target / name)
+        revision = re.search(r'^rev\s*=\s*"([^"]+)"', (pins / 'lakefile.toml').read_text(encoding='utf-8'), re.M)
+        lakefile = target / 'lakefile.toml'
+        lakefile.write_text(re.sub(r'^rev\s*=\s*"[^"]+"', f'rev = "{revision.group(1)}"',
+                                   lakefile.read_text(encoding='utf-8'), flags=re.M), encoding='utf-8', newline='\n')
+    manifest = target / 'lake-manifest.json'
+    data = json.loads(manifest.read_text(encoding='utf-8'))
+    data['name'] = lib
+    manifest.write_text(json.dumps(data, indent=1) + '\n', encoding='utf-8', newline='\n')
+    if git and shutil.which('git'):
+        subprocess.run(['git', 'init', '--quiet'], cwd=target, check=False)
+    # Сводки собираются сразу, чтобы первая проверка проекта прошла
+    subprocess.run([sys.executable, 'scripts/proj.py', 'sync'], cwd=target, check=False, capture_output=True)
+    print(f'Проект создан: {target}\n\nДальше, из папки проекта:\n'
+          '  lake exe cache get                  # готовая сборка Mathlib\n'
+          '  lake build\n'
+          '  python scripts/proj.py doctor       # окружение\n'
+          '  python scripts/proj.py check        # одно замечание о примере R01\n'
+          'Затем заполните question.md и PROJECT.md; остальное — в README.md проекта.')
+
+
+def update(target: Path, dry: bool) -> None:
+    config = tomllib.loads((target / 'project.toml').read_text(encoding='utf-8'))['project']
+    changed = []
+    for source in files():
+        relative = source.relative_to(TEMPLATE).as_posix()
+        if not any(fnmatch.fnmatch(relative, pattern) for pattern in TOOLING):
+            continue
+        data = render(source.read_bytes(), config['lib'], config.get('title', ''))
+        destination = target / relative
+        if not destination.exists() or destination.read_bytes().replace(b'\r\n', b'\n') != data:
+            changed.append(relative)
+            if not dry:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(data)
+    print(('Изменились бы:' if dry else 'Обновлены:') if changed else 'Инструменты проекта совпадают с шаблоном.')
+    print('\n'.join('  ' + name for name in changed))
+    known = {source.relative_to(TEMPLATE).as_posix() for source in files()}
+    extra = sorted(
+        relative for folder in ('scripts', 'tests', '.claude/agents', '.claude/commands', '.claude/skills')
+        for path in (target / folder).rglob('*') if path.is_file() and not SKIP & set(path.parts)
+        for relative in [path.relative_to(target).as_posix()] if relative not in known)
+    if extra:
+        print('Есть в проекте, но не в шаблоне (свои или устаревшие; не удаляются):')
+        print('\n'.join('  ' + name for name in extra))
+    if changed and not dry:
+        print('Проверьте: python -m unittest discover tests; python scripts/proj.py check --fast')
+
+
+def main() -> None:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('target', type=Path, help='папка нового проекта или, с --update, существующего')
+    parser.add_argument('--lib', help='имя библиотеки Lean и пространства имён')
+    parser.add_argument('--title', help='название темы')
+    parser.add_argument('--pins-from', type=Path, help='проект, из которого взять версии Lean и Mathlib')
+    parser.add_argument('--no-git', action='store_true', help='не выполнять git init')
+    parser.add_argument('--update', action='store_true', help='обновить инструменты существующего проекта')
+    parser.add_argument('--dry-run', action='store_true', help='с --update: только показать, что изменится')
+    args = parser.parse_args()
+    if args.update:
+        update(args.target.resolve(), args.dry_run)
+    elif not (args.lib and args.title):
+        parser.error('для нового проекта нужны --lib и --title')
+    else:
+        create(args.target.resolve(), args.lib, args.title, args.pins_from, not args.no_git)
+
+
+if __name__ == '__main__':
+    main()

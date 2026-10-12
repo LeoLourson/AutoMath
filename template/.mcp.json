@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "lean-lsp": {
+      "command": "uvx",
+      "args": ["lean-lsp-mcp==0.31.0"]
+    },
+    "lit": {
+      "command": "uv",
+      "args": ["run", "--script", "scripts/lit_mcp.py"]
+    },
+    "proj": {
+      "command": "uv",
+      "args": ["run", "--script", "scripts/proj_mcp.py"]
+    }
+  }
+}
