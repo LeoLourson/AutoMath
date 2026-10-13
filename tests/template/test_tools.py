@@ -1,13 +1,28 @@
-"""Тесты инструментов проекта. Сеть, Lean и модель поиска не нужны: python -m unittest discover tests"""
+"""Тесты инструментов проекта. Сеть, Lean и модель поиска не нужны.
+
+    python -m unittest discover -s tests/template
+
+Обе группы работают на временном каталоге, поэтому состояние модулей задаёт
+единственная точка настройки — `_as_template()`.
+"""
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'scripts'))
+TEMPLATE = Path(__file__).resolve().parents[2] / 'template'
+sys.path.insert(0, str(TEMPLATE / 'scripts'))
 import leandecl  # noqa: E402
 import lit  # noqa: E402
 import proj  # noqa: E402
+import records  # noqa: E402
+
+
+def _as_template() -> Path:
+    """Настраивает proj и lit на каталог шаблона."""
+    proj.configure(TEMPLATE)
+    lit.configure(TEMPLATE)
+    return TEMPLATE
 
 LEAN = '''module
 
@@ -106,14 +121,15 @@ class ProjectRecords(unittest.TestCase):
 
     def tearDown(self):
         self.folder.cleanup()
+        _as_template()
 
     def test_new_numbers_and_front_matter(self):
         first = proj.new('result', 'Первая: с двоеточием')
         second = proj.new('result', 'Вторая', depends='R01')
         self.assertEqual((first.name, second.name), ('R01.md', 'R02.md'))
-        doc = proj.read_doc(second)
+        doc = records.read_doc(second)
         self.assertEqual((doc.meta['id'], doc.meta['status'], doc.meta['depends']), ('R02', 'цель', ['R01']))
-        self.assertEqual(proj.read_doc(first).meta['title'], 'Первая: с двоеточием')
+        self.assertEqual(records.read_doc(first).meta['title'], 'Первая: с двоеточием')
         proj.set_field('R02', 'lean', 'Demo.const_even, Demo.scaled_even')
         self.assertEqual(proj.find_doc('R02').meta['lean'], ['Demo.const_even', 'Demo.scaled_even'])
         with self.assertRaises(SystemExit):
@@ -165,6 +181,24 @@ class ProjectRecords(unittest.TestCase):
 
 
 class Sources(unittest.TestCase):
+    def test_configure_points_paths_at_the_project(self):
+        """Пути источников выводятся из корня, а не из места установки скрипта."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / 'project.toml').write_text('[project]\nlib = "Demo"\n[sources]\ndirect_hosts = ["example.org"]\n',
+                                               encoding='utf-8')
+            (root / 'sources' / 'cards').mkdir(parents=True)
+            (root / 'sources' / 'papers.json').write_text('[]', encoding='utf-8')
+            records.card_for(root, 'S7', 'Теорема о базисах')
+            try:
+                lit.configure(root)
+                self.assertEqual(lit.REGISTRY, root / 'sources' / 'papers.json')
+                self.assertEqual(lit.DB, root / 'output' / 'literature' / 'index' / 'lit.sqlite')
+                self.assertEqual(lit.DIRECT_HOSTS, ['example.org'])
+                self.assertEqual(lit.cards(), {'S7'})
+            finally:
+                _as_template()
+
     def test_identifiers(self):
         cases = {
             '2107.12209v2': ('arxiv', '2107.12209v2'),

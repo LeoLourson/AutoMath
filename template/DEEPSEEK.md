@@ -68,8 +68,8 @@ MCP-серверы в корне проекта; вызов MCP может за�
 ## Как переносится воркфлоу Claude Code
 
 Новая команда, роль, навык или MCP-сервер попадают в Harness после `prepare` (его
-вызывают `run` и `create.py --update`). В `scripts/harness.py`, тестах и этом файле их
-имён нет, править там нечего.
+вызывают `run` и `tools/create.py --update` из папки шаблона). В `scripts/harness.py`,
+тестах и этом файле их имён нет, править там нечего.
 
 | В Claude Code | В Harness |
 | --- | --- |
@@ -105,12 +105,12 @@ MCP-серверы в корне проекта; вызов MCP может за�
 При удалении исходной команды её неизменённые производные файлы убираются по манифесту;
 чужие файлы не удаляются, ручные изменения устаревших производных требуют переноса.
 
-`create.py` подготавливает интеграцию при создании и обновлении проекта. Для старого
-проекта выполните из папки шаблона:
+`tools/create.py` из репозитория шаблона подготавливает интеграцию при создании и
+обновлении проекта. Для старого проекта выполните из папки шаблона:
 
 ```sh
-python create.py --update ../Spectra --dry-run
-python create.py --update ../Spectra
+python tools/create.py --update ../Spectra --dry-run
+python tools/create.py --update ../Spectra
 ```
 
 Собственные настройки `.mcp.json`, `.claude/settings.json` и файлы исследования
@@ -122,9 +122,9 @@ python create.py --update ../Spectra
 сгенерированного: `python scripts/harness.py run web -- --patch /path/to/local.yml`.
 Адаптер не переносит разрешения Claude и не меняет глобальные настройки Harness.
 Права задаются в Harness; ограничения мест записи в ролях являются инструкциями.
-MCP с `env`/`headers` настраиваются отдельным Cordis patch, чтобы не размножать секреты.
-Для такого сервера отметьте запись в `.mcp.json` как `disabled: true` и включите её
-локальным patch. Поддерживаются stdio и HTTP; SSE не конвертируется.
+Поле `env` stdio-сервера копируется в patch, который лежит в `output/` вне Git; ключи в
+`.mcp.json` не храните. HTTP-сервер с `headers` настраивается отдельным Cordis patch:
+отметьте запись в `.mcp.json` как `disabled: true` и включите её локальным patch. Поддерживаются stdio и HTTP; SSE не конвертируется.
 
 ## Проверка
 
@@ -134,6 +134,10 @@ python scripts/harness.py list
 python -m unittest discover tests
 python scripts/proj.py check --fast
 ```
+
+Тот же набор команд выполняет CI проекта (`.github/workflows/ci.yml`); проверка
+`harness.py check` там идёт после `prepare`, а `harness_runtime.mjs` сверяет patch со
+схемами закреплённой версии Harness.
 
 `harness.py check` проверяет свежесть файлов, не запускает модель и ничего не пишет.
 Структуру итоговой конфигурации можно проверить самим Harness без запроса к модели:
@@ -146,8 +150,8 @@ python scripts/harness.py run web -- --dump-config
 
 ```sh
 npm install --prefix output/harness/runtime @deepseek-ai/dsh@0.2.1-alpha.2
-node tests/harness_runtime.mjs output/harness/runtime/node_modules
-node tests/harness_runtime.mjs output/harness/runtime/node_modules --mcp
+node tests/template/harness_runtime.mjs output/harness/runtime/node_modules
+node tests/template/harness_runtime.mjs output/harness/runtime/node_modules --mcp
 ```
 
 Последняя команда проверяет handshake и список инструментов каждого MCP-сервера,

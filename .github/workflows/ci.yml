@@ -20,8 +20,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: python -X utf8 -m unittest discover -s template/tests
-      - run: python -X utf8 -m unittest discover -s tests
+      - run: python -X utf8 -m unittest discover -s tests/template
+      - run: python -X utf8 -m unittest discover -s tests/kit
 
   harness-contract:
     runs-on: ubuntu-latest
@@ -35,4 +35,4 @@ jobs:
           node-version: '24'
       - run: python template/scripts/harness.py prepare
       - run: npm install --prefix "$RUNNER_TEMP/research-dsh" "$(python template/scripts/harness.py package)"
-      - run: node template/tests/harness_runtime.mjs "$RUNNER_TEMP/research-dsh/node_modules"
+      - run: node tests/template/harness_runtime.mjs "$RUNNER_TEMP/research-dsh/node_modules"

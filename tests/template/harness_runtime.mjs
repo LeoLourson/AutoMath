@@ -1,12 +1,13 @@
 // Contract check against the real, pinned Harness packages. No LLM calls.
-// node tests/harness_runtime.mjs /path/to/node_modules [--mcp]
+// node tests/template/harness_runtime.mjs /path/to/node_modules [--mcp]
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+// tests/template/ -> repository root, where template/scripts/harness.py writes output/.
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (!process.argv[2]) throw new Error('Pass the node_modules directory containing @deepseek-ai/dsh');
 const modules = resolve(process.argv[2]);
 const requireDsh = createRequire(resolve(modules, '@deepseek-ai/dsh/package.json'));

@@ -29,7 +29,7 @@
 Из папки шаблона:
 
 ```
-python create.py ..\Spectra --lib Spectra --title "Название темы"
+python tools/create.py ..\Spectra --lib Spectra --title "Название темы"
 cd ..\Spectra
 lake exe cache get
 lake build
@@ -48,7 +48,7 @@ python scripts/proj.py check
 Для DeepSeek Harness запустите `python scripts/harness.py run web`, выберите папку
 проекта и preset Standard, настройте модель и ключ в интерфейсе Harness. Создание
 проекта уже подготовило skills, роли и MCP; запуск обновит их при необходимости.
-Полная инструкция — [DEEPSEEK.md](template/DEEPSEEK.md), она также лежит в созданном проекте.
+Полная инструкция — [DEEPSEEK.md](../template/DEEPSEEK.md), она также лежит в созданном проекте.
 
 ## Шаг 2. Записать постановку
 
@@ -266,8 +266,8 @@ Lean, агенты и номера записей в тексте статьи �
 Когда шаблон изменился, из папки шаблона:
 
 ```
-python create.py --update ..\Spectra --dry-run
-python create.py --update ..\Spectra
+python tools/create.py --update ..\Spectra --dry-run
+python tools/create.py --update ..\Spectra
 ```
 
 Первая команда показывает, что изменится, вторая переписывает правила, скрипты, агентов,
@@ -275,7 +275,7 @@ python create.py --update ..\Spectra
 как были.
 
 Для DeepSeek Harness отдельного обновления нет: его skills и роли собираются из тех же
-агентов, команд и скиллов. `create.py --update` пересобирает их сам, а после своей правки
+агентов, команд и скиллов. `tools/create.py --update` пересобирает их сам, а после своей правки
 в `.claude/` или `.mcp.json` это делает `python scripts/harness.py prepare` или следующий
 `run`. Что получит Harness, показывает `python scripts/harness.py list`.
 

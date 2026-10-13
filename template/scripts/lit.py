@@ -37,13 +37,8 @@ import xml.etree.ElementTree as ET
 from datetime import date
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
-REGISTRY = ROOT / 'sources' / 'papers.json'
-CATALOG = ROOT / 'sources' / 'catalog.md'
-CARDS = ROOT / 'sources' / 'cards'
-RESULTS = ROOT / 'sources' / 'results.md'  # вариант раскладки: все карточки в одном файле
-LIT = ROOT / 'output' / 'literature'
-DB = LIT / 'index' / 'lit.sqlite'
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import records  # noqa: E402
 
 MODEL = 'intfloat/multilingual-e5-small'
 CHUNKER = 3  # увеличить после изменения нарезки: индекс пересоберётся
@@ -52,15 +47,37 @@ USER_AGENT = 'lit/2.0 (research script)'
 ATOM = {'a': 'http://www.w3.org/2005/Atom', 'x': 'http://arxiv.org/schemas/atom'}
 DELAYS = {'arxiv.org': 3.0, 'mathnet.ru': 2.0, 'semanticscholar.org': 1.0}  # секунд между запросами
 
+# Пути проекта; до configure() действует корень этого файла, тесты подставляют временный.
+ROOT: Path
+REGISTRY: Path
+CATALOG: Path
+CARDS: Path
+RESULTS: Path  # вариант раскладки: все карточки в одном файле
+LIT: Path
+DB: Path
+# Хосты, до которых трафик через VPN-туннель не доходит: к ним идём с адреса другого
+# интерфейса. Список берётся из project.toml или переменной LIT_DIRECT_HOSTS.
+DIRECT_HOSTS: list[str] = []
 
-def settings() -> dict:
-    path = ROOT / 'project.toml'
-    return tomllib.loads(path.read_text(encoding='utf-8')).get('sources', {}) if path.exists() else {}
+
+def configure(root: Path, direct_hosts: list[str] | None = None) -> None:
+    """Привязывает пути к корню проекта; тесты вызывают с временным каталогом."""
+    global ROOT, REGISTRY, CATALOG, CARDS, RESULTS, LIT, DB, DIRECT_HOSTS
+    ROOT = Path(root)
+    REGISTRY = ROOT / 'sources' / 'papers.json'
+    CATALOG = ROOT / 'sources' / 'catalog.md'
+    CARDS = ROOT / 'sources' / 'cards'
+    RESULTS = ROOT / 'sources' / 'results.md'
+    LIT = ROOT / 'output' / 'literature'
+    DB = LIT / 'index' / 'lit.sqlite'
+    configured = tomllib.loads((ROOT / 'project.toml').read_text(encoding='utf-8')) if \
+        (ROOT / 'project.toml').exists() else {}
+    from_env = [host.strip() for host in os.environ.get('LIT_DIRECT_HOSTS', '').split(',') if host.strip()]
+    DIRECT_HOSTS = direct_hosts if direct_hosts is not None else \
+        from_env or configured.get('sources', {}).get('direct_hosts', ['mathnet.ru'])
 
 
-# Хосты, до которых трафик через VPN-туннель не доходит: к ним идём с адреса другого интерфейса
-DIRECT_HOSTS = [host.strip() for host in os.environ.get('LIT_DIRECT_HOSTS', '').split(',') if host.strip()] \
-    or settings().get('direct_hosts', ['mathnet.ru'])
+configure(Path(__file__).resolve().parent.parent)
 
 
 # ---------- сеть ----------
@@ -682,7 +699,9 @@ def pages(code: str, first: int = 1, last: int | None = None, dpi: int = 170) ->
 
 def cards() -> set[str]:
     """Коды источников, у которых есть карточка проверенных теорем."""
-    found = {path.stem.upper() for path in CARDS.glob('S*.md')} if CARDS.exists() else set()
+    found: set[str] = set()
+    if CARDS.exists():
+        found = {doc.id for doc in (records.read_doc(path) for path in CARDS.glob('S*.md')) if doc.id}
     if RESULTS.exists():
         headings = ' '.join(re.findall(r'^## (.*)$', RESULTS.read_text(encoding='utf-8'), re.M))
         found |= set(re.findall(r'S\d+', headings))
@@ -1212,6 +1231,8 @@ def main() -> None:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('--root', type=Path, default=ROOT,
+                        help='корень проекта, по умолчанию каталог над scripts/')
     commands = parser.add_subparsers(dest='command', required=True)
 
     p = commands.add_parser('add', help='добавить источники: arXiv, mathnet:rm9740, DOI')
@@ -1262,6 +1283,7 @@ def main() -> None:
     commands.add_parser('list', help='источники реестра и число кусков в индексе')
 
     args = parser.parse_args()
+    configure(args.root)
     log = lambda line: print(line, file=sys.stderr, flush=True)
     codes = [code.upper() for code in getattr(args, 'codes', None) or []] or None
     if args.command == 'add':

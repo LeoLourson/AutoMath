@@ -1,11 +1,14 @@
 """Новый исследовательский проект из template/ или обновление инструментов в существующем.
 
-    python create.py ПАПКА --lib Spectra --title "Название темы" [--pins-from ПРОЕКТ] [--no-git]
-    python create.py --update ПРОЕКТ [--dry-run]
+    python tools/create.py ПАПКА --lib Spectra --title "Название темы" [--pins-from ПРОЕКТ] [--no-git]
+    python tools/create.py --update ПРОЕКТ [--dry-run]
 
 Создание копирует весь шаблон и подставляет имя библиотеки и название. Обновление
 переписывает только инструменты (правила, скрипты, агентов, команды, тесты); постановка,
 записи, идеи, источники, библиотека Lean и статья не трогаются.
+
+Команды ниже в подсказках выполняются уже в папке созданного проекта, где этот файл
+лежит как scripts/proj.py.
 """
 from __future__ import annotations
 
@@ -19,7 +22,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-TEMPLATE = Path(__file__).resolve().parent / 'template'
+TEMPLATE = Path(__file__).resolve().parent.parent / 'template'
 # Файлы, которыми владеет шаблон: обновление переписывает их в проекте
 TOOLING = ['AGENTS.md', 'CLAUDE.md', 'DEEPSEEK.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
            '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml']
