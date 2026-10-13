@@ -13,7 +13,7 @@ description: Ежедневный цикл — состояние, идеи с �
 
 1. `git status --short` и `git log -3 --oneline`. Незакоммиченные изменения прошлого дня
    назови в отчёте.
-2. `python scripts/proj.py check`. Ошибки чинятся до новых целей. Замечания выпиши: из
+2. `python scripts/state/proj.py check`. Ошибки чинятся до новых целей. Замечания выпиши: из
    них берётся работа дня — записи без рецензии, непроверенное или устаревшее
    соответствие, источники без карточек, идеи без критики.
 3. Прочитай `question.md`, `blueprint.md`, `ideas/README.md`. Записи и идеи открывай
@@ -37,7 +37,7 @@ description: Ежедневный цикл — состояние, идеи с �
 
 ## 4. Работа над целью
 
-- **Доказательство.** Создай запись: `python scripts/proj.py new result "Название"
+- **Доказательство.** Создай запись: `python scripts/state/proj.py new result "Название"
   --depends R03,R05`. Запиши утверждение, полное доказательство и границы; поставь статус
   `доказано`; идее поставь статус `перенесена` и поле `result`. Затем выполни шаги
   команды `/referee`.
@@ -51,14 +51,14 @@ description: Ежедневный цикл — состояние, идеи с �
 
 Шаг выполняется, только если пользователь попросил об этом в пожелании или в разделе
 «Особые правила» файла `PROJECT.md`. Заготовку с `sorry` для самой трудоёмкой леммы дня
-упакуй командой `python scripts/proj.py aristotle pack ИМЯ output/drafts/Лемма.lean`,
+упакуй командой `python scripts/state/proj.py aristotle pack ИМЯ output/drafts/Лемма.lean`,
 допиши `prompt.md` и отправь. Готовые ответы прошлых дней прими:
-`python scripts/proj.py aristotle accept ИМЯ АРХИВ`, затем перенос модуля, `lake build`
+`python scripts/state/proj.py aristotle accept ИМЯ АРХИВ`, затем перенос модуля, `lake build`
 и шаг 3 команды `/formalize`.
 
 ## 6. Завершение
 
-1. `python scripts/proj.py sync`, `python scripts/proj.py check`. Если менялись файлы в
+1. `python scripts/state/proj.py sync`, `python scripts/state/proj.py check`. Если менялись файлы в
    `scripts/`, ещё `python -m unittest discover tests`.
 2. Раздел «Ответ на …» в `question.md` обнови, если изменился ответ на вопрос. Статусы в
    нём не повторяются.

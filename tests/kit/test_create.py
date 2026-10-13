@@ -25,7 +25,8 @@ class ProjectGeneration(unittest.TestCase):
             create_project.create(self.root, 'Spectra', 'Спектральная задача', None, False)
 
     def load_harness(self):
-        spec = importlib.util.spec_from_file_location('harness', create_project.TEMPLATE / 'scripts/harness.py')
+        spec = importlib.util.spec_from_file_location('harness',
+                                                      create_project.TEMPLATE / 'scripts/host/harness.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
@@ -51,7 +52,7 @@ class ProjectGeneration(unittest.TestCase):
         self.assertEqual(harness.unported(create_project.TEMPLATE), [])
 
     def test_dry_update_preserves_every_byte(self):
-        (self.root / 'scripts/harness.py').write_text('old adapter', encoding='utf-8')
+        (self.root / 'scripts/host/harness.py').write_text('old adapter', encoding='utf-8')
         before = self.snapshot()
         with contextlib.redirect_stdout(io.StringIO()):
             create_project.update(self.root, True)
@@ -67,7 +68,7 @@ class ProjectGeneration(unittest.TestCase):
         mcp['mcpServers']['lit']['args'].insert(0, '--offline')
         mcp_file.write_text(json.dumps(mcp), encoding='utf-8')
         saved['.mcp.json'] = mcp_file.read_bytes()
-        (self.root / 'scripts/harness.py').unlink()
+        (self.root / 'scripts/host/harness.py').unlink()
         (self.root / 'DEEPSEEK.md').unlink()
         (self.root / '.dsh/skills/day/SKILL.md').unlink()
         with contextlib.redirect_stdout(io.StringIO()):

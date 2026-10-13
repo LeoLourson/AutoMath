@@ -16,7 +16,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]  # scripts/host/harness.py -> корень проекта
 DSH_VERSION = '0.2.1-alpha.2'
 DSH_PACKAGE = f'@deepseek-ai/dsh@{DSH_VERSION}'
 UPSTREAM_REVISION = 'd743267388641bc76f17c45ce8b4c231aed1d32c'
@@ -392,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
             return int(bool(changed))
         if args.command == 'prepare':
             print(f'DeepSeek Harness {DSH_VERSION}: подготовлено файлов: {len(changed)}.\n'
-                  f'Patch: {root / PATCH}\nЗапуск: python scripts/harness.py run web')
+                  f'Patch: {root / PATCH}\nЗапуск: python scripts/host/harness.py run web')
             return 0
         extra = args.args[1:] if args.args[:1] == ['--'] else args.args
         command = runtime_command() + [args.profile, '--patch', str(root / PATCH), *extra]

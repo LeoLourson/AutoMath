@@ -2,7 +2,12 @@
 # requires-python = ">=3.11"
 # dependencies = ["mcp>=1.2,<2", "numpy", "onnxruntime", "tokenizers", "huggingface_hub", "pymupdf", "certifi"]
 # ///
-"""MCP-сервер источников: те же действия, что в scripts/lit.py, с моделью поиска в памяти."""
+"""MCP-сервер источников: те же действия, что в scripts/sources/lit.py, с моделью поиска в памяти.
+
+Запускается из корня проекта: `uv run --directory . --script scripts/sources/mcp.py`.
+Каталог скриптов попадает в sys.path при загрузке этого файла, корень проекта — из
+`--directory`.
+"""
 import contextlib
 import functools
 import sys
@@ -10,7 +15,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import lit  # noqa: E402
 
 server = FastMCP('lit', instructions=(
@@ -131,5 +137,5 @@ def papers() -> str:
 
 if __name__ == '__main__':
     # Модель загружается до запуска сервера: под Windows загрузка из обработчика зависает
-    lit.embed(['прогрев'], 'query: ')
+    lit.search.embed(['прогрев'], 'query: ')
     server.run()

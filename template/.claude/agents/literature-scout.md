@@ -15,13 +15,13 @@ omitClaudeMd: true
 
 Запускай из корня проекта; те же действия есть у сервера `lit`.
 
-- `python scripts/lit.py find "Riesz basis involution differential operator" -n 20` —
+- `python scripts/sources/lit.py find "Riesz basis involution differential operator" -n 20` —
   zbMATH и arXiv сразу. zbMATH — главный источник: в нём переводные и русские журналы с
   аннотациями. С ключом `--in zbmath` доступны поля `ti:`, `au:`, `py:` и связки `&`,
   `|`; с ключом `--in arxiv` — поля `all:`, `ti:`, `abs:`, `au:` и связки `AND`, `OR`.
-- `python scripts/lit.py find "русское название или ключевые слова" --in mathnet` — журналы
+- `python scripts/sources/lit.py find "русское название или ключевые слова" --in mathnet` — журналы
   Math-Net.Ru; в ответе идентификаторы вида `mathnet:mzm12557`.
-- `python scripts/lit.py cites S2` — кто цитирует источник из реестра; с ключом `--refs` —
+- `python scripts/sources/lit.py cites S2` — кто цитирует источник из реестра; с ключом `--refs` —
   его список литературы. Вместо кода годится идентификатор arXiv, `mathnet:…` или DOI.
 - `WebSearch` — для того, чего нет в базах. Идентификатор MathNet у переводной статьи
   находится запросом `site:mathnet.ru "английское или русское название"`.

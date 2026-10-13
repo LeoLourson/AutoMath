@@ -17,6 +17,8 @@ from pathlib import Path
 
 RESULT_STATUS = ['цель', 'набросок', 'доказано', 'опровергнуто']
 IDEA_STATUS = ['новая', 'выдержала критику', 'в работе', 'отвергнута', 'перенесена']
+# Аксиомы, на которые разрешено опираться, если project.toml не задаёт свой список.
+DEFAULT_AXIOMS = ['propext', 'Classical.choice', 'Quot.sound']
 # Вид записи: папка и префикс номера.
 FOLDERS = {'result': ('results', 'R'), 'idea': ('ideas', 'I'), 'card': ('sources/cards', 'S')}
 # Поля шапки, которые всегда списки, даже когда в записи стоит одно значение.

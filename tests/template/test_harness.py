@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 PROJECT = Path(__file__).resolve().parents[2] / 'template'
-sys.path.insert(0, str(PROJECT / 'scripts'))
-import harness
+sys.path.insert(0, str(PROJECT / 'scripts' / 'host'))
+import harness  # noqa: E402
 
 
 class HarnessAdapter(unittest.TestCase):

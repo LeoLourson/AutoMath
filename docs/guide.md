@@ -33,8 +33,8 @@ python tools/create.py ..\Spectra --lib Spectra --title "Название тем
 cd ..\Spectra
 lake exe cache get
 lake build
-python scripts/proj.py doctor
-python scripts/proj.py check
+python scripts/state/proj.py doctor
+python scripts/state/proj.py check
 ```
 
 `--lib` — имя библиотеки Lean и пространства имён: латиница, с заглавной буквы, без
@@ -42,10 +42,10 @@ python scripts/proj.py check
 займёт часы. `doctor` проверяет окружение, `check` — сам проект; в свежем проекте `check`
 выдаёт одно замечание о записи-примере.
 
-Один раз выполните `uv run scripts/lit.py list`: команда поставит зависимости поиска по
+Один раз выполните `uv run scripts/sources/lit.py list`: команда поставит зависимости поиска по
 литературе, и редактору не придётся ждать этого при первом запуске.
 
-Для DeepSeek Harness запустите `python scripts/harness.py run web`, выберите папку
+Для DeepSeek Harness запустите `python scripts/host/harness.py run web`, выберите папку
 проекта и preset Standard, настройте модель и ключ в интерфейсе Harness. Создание
 проекта уже подготовило skills, роли и MCP; запуск обновит их при необходимости.
 Полная инструкция — [DEEPSEEK.md](../template/DEEPSEEK.md), она также лежит в созданном проекте.
@@ -67,7 +67,7 @@ python scripts/proj.py check
 сначала пуст: его пополняют агенты критик и рецензент, когда находят вывод, который в этой теме выглядит интуитивно верным, но неверен.
 
 После этого удалите примеры: файл `results/R01.md` и теорему `sq_add` из `Basic.lean` в
-папке библиотеки, затем выполните `python scripts/proj.py sync`.
+папке библиотеки, затем выполните `python scripts/state/proj.py sync`.
 
 ## Шаг 3. Работать командами
 
@@ -93,7 +93,7 @@ python scripts/proj.py check
 авторский LaTeX, с MathNet — PDF, по одному DOI — только описание.
 
 Статью, которой нет в открытом доступе, вы добавляете сами:
-`python scripts/lit.py attach S31 путь\к\файлу.pdf`.
+`python scripts/sources/lit.py attach S31 путь\к\файлу.pdf`.
 
 Теорему источника нельзя использовать как посылку, пока у неё нет карточки в
 `sources/cards/`. Карточка содержит номер теоремы, страницу, все гипотезы вместе с
@@ -129,7 +129,7 @@ python scripts/proj.py check
 
 Доказательство пишется в запись `results/R*.md` — на утверждение свой файл с разделами
 «Утверждение», «Доказательство», «Границы». Запись создаёт команда
-`python scripts/proj.py new result "Название"`; текст можете написать вы или попросить об
+`python scripts/state/proj.py new result "Название"`; текст можете написать вы или попросить об
 этом Claude обычным сообщением.
 
 `/referee R07` отдаёт запись рецензенту. Вердикты:
@@ -197,7 +197,7 @@ Lean, агенты и номера записей в тексте статьи �
 | `sources/catalog.md` | источники со ссылками и статусами |
 | `question.md`, раздел «Ответ на …» | короткий ответ на вопрос со ссылками на записи |
 
-Первые три файла собирает `python scripts/proj.py sync` из шапок записей; руками они не
+Первые три файла собирает `python scripts/state/proj.py sync` из шапок записей; руками они не
 правятся.
 
 Шапка записи показывает, насколько утверждению можно верить:
@@ -233,7 +233,7 @@ Lean, агенты и номера записей в тексте статьи �
 
 Всё, что делают команды, доступно и из терминала.
 
-Проект — `python scripts/proj.py …`:
+Проект — `python scripts/state/proj.py …`:
 
 | Команда | Действие |
 | --- | --- |
@@ -246,7 +246,7 @@ Lean, агенты и номера записей в тексте статьи �
 | `tex paper/main.tex` | собрать статью |
 | `doctor` | проверить окружение |
 
-Литература — `python scripts/lit.py …`:
+Литература — `python scripts/sources/lit.py …`:
 
 | Команда | Действие |
 | --- | --- |
@@ -276,8 +276,8 @@ python tools/create.py --update ..\Spectra
 
 Для DeepSeek Harness отдельного обновления нет: его skills и роли собираются из тех же
 агентов, команд и скиллов. `tools/create.py --update` пересобирает их сам, а после своей правки
-в `.claude/` или `.mcp.json` это делает `python scripts/harness.py prepare` или следующий
-`run`. Что получит Harness, показывает `python scripts/harness.py list`.
+в `.claude/` или `.mcp.json` это делает `python scripts/host/harness.py prepare` или следующий
+`run`. Что получит Harness, показывает `python scripts/host/harness.py list`.
 
 ## Если что-то не работает
 
@@ -292,7 +292,7 @@ python tools/create.py --update ..\Spectra
   `mathlib-scout`.
 - Инструменты ведут себя странно после правки `scripts/` —
   `python -m unittest discover tests`.
-- В Harness нет команды, роли или инструмента MCP. `python scripts/harness.py list`
-  показывает, что адаптер собрал; `python scripts/harness.py check` — устарели ли
+- В Harness нет команды, роли или инструмента MCP. `python scripts/host/harness.py list`
+  показывает, что адаптер собрал; `python scripts/host/harness.py check` — устарели ли
   производные файлы. Запуск идёт только через `harness.py run` или с ключом `--patch`,
   после пересборки Harness перезапускается. Остальное — в `DEEPSEEK.md`.

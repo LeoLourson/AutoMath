@@ -18,7 +18,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, mcp__lean-lsp, mcp__proj
 
 Запись пока не открывай.
 
-1. Возьми формулировки: `python scripts/proj.py statement R07` или инструмент `statement`
+1. Возьми формулировки: `python scripts/state/proj.py statement R07` или инструмент `statement`
    сервера `proj`. Открой исходный файл: команды `variable`, `open` и локальные
    обозначения выше объявления входят в формулировку.
 2. Разверни каждое определение проекта из формулировки до понятий Mathlib. У понятий
@@ -83,5 +83,5 @@ tools: Read, Grep, Glob, Bash, Write, Edit, mcp__lean-lsp, mcp__proj
 
 Первая строка: `ВЕРДИКТ: соответствует | соответствует с оговорками | не соответствует`.
 Вторая: `ОТПЕЧАТОК: …` — значение из последней строки вывода
-`python scripts/proj.py fingerprint R07`. Затем расхождения списком и то, что проверить
+`python scripts/state/proj.py fingerprint R07`. Затем расхождения списком и то, что проверить
 не удалось.

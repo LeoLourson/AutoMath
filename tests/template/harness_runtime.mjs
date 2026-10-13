@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// tests/template/ -> repository root, where template/scripts/harness.py writes output/.
+// tests/template/ -> repository root, where template/scripts/host/harness.py writes output/.
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (!process.argv[2]) throw new Error('Pass the node_modules directory containing @deepseek-ai/dsh');
 const modules = resolve(process.argv[2]);

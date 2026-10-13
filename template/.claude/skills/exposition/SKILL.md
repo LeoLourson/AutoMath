@@ -69,7 +69,7 @@ disable-model-invocation: true
 
 1. Чек-листы скиллов: «Проверка перед сдачей» из `shkalikov-style`, «Проверка канвы» из
    `paper-canvas`, чек-лист `paper-de-ai` — по изменённым местам.
-2. `python scripts/proj.py tex paper/main.tex`: два прохода `pdflatex`, в журнале нет
+2. `python scripts/state/proj.py tex paper/main.tex`: два прохода `pdflatex`, в журнале нет
    неразрешённых ссылок и `Overfull`.
 3. Отчёт: что внесено и в какое место, что изменилось в аннотации и введении, что
    сознательно не внесено и почему, результат сборки.

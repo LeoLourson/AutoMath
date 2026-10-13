@@ -3,6 +3,8 @@
 Разбор текстовый и приблизительный: он не заменяет компилятор. Существование имени и аксиомы
 проверяет `proj.py audit` через Lean; здесь — то, что нужно без сборки: найти объявление, вынуть
 формулировку, сравнить её с заготовкой, заметить, что формулировка или определения изменились.
+
+Модуль группы `check/`: ею пользуются и проверки (`proj.py check`), и отпечаток формулировки.
 """
 from __future__ import annotations
 
@@ -178,6 +180,12 @@ def fingerprint(index: dict[str, Decl], name: str) -> tuple[str, list[str]]:
                         queue.extend(item.variables)
     material = [decl.statement] + decl.variables + [squash(seen[key].text) for key in sorted(seen)]
     return hashlib.sha256('\n'.join(material).encode('utf-8')).hexdigest()[:12], sorted(seen)
+
+
+def record_fingerprint(index: dict[str, Decl], names: list[str]) -> str:
+    """Общий отпечаток формулировок записи: его последним словом стоит вердикт в поле fidelity."""
+    parts = sorted(f'{name} {fingerprint(index, name)[0]}' for name in names)
+    return hashlib.sha256('\n'.join(parts).encode('utf-8')).hexdigest()[:12]
 
 
 def compare(skeleton: str, result: str) -> dict[str, list[str]]:

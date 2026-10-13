@@ -10,10 +10,10 @@
 ## DeepSeek Harness
 
 Запуск и подготовка описаны в `DEEPSEEK.md`. В Harness команды из таблицы ниже —
-нативные skills из `.dsh/skills/`, собираемые `python scripts/harness.py prepare`.
+нативные skills из `.dsh/skills/`, собираемые `python scripts/host/harness.py prepare`.
 Исходники `.claude/` общие для двух сред; производные `.dsh/skills/` вручную не правят.
 Команду, роль или навык меняют только в `.claude/`: адаптер читает их состав оттуда, а
-`python scripts/harness.py list` показывает, что получит Harness.
+`python scripts/host/harness.py list` показывает, что получит Harness.
 
 Роль из таблицы «Агенты» вызывается инструментом с именем `research_` + имя роли с
 подчёркиваниями вместо дефисов: `research_idea_generator`. Каждый инструмент запускает роль через `spawn`, с пустой историей;
@@ -36,7 +36,7 @@
 | Утверждения с доказательствами, по файлу на запись | `results/R*.md` | роли из раздела «Агенты» |
 | Идеи, по файлу на идею | `ideas/I*.md` | генератор идей, критик |
 | Численные и символьные опыты с кодом | `experiments/E*/` | экспериментатор |
-| Реестр источников, карточки теорем | `sources/papers.json`, `sources/cards/S*.md` | `scripts/lit.py`; карточку сверяет проверяющий источники |
+| Реестр источников, карточки теорем | `sources/papers.json`, `sources/cards/S*.md` | `scripts/sources/lit.py`; карточку сверяет проверяющий источники |
 | Библиотека Lean | каталог и корневой файл с именем из `project.toml` | формализатор |
 | Статья | `paper/main.tex` | только команда `/exposition` (скилл `exposition`) |
 | Сводки | `blueprint.md`, `ideas/README.md`, `sources/catalog.md` | только `proj.py sync` |
@@ -86,7 +86,7 @@
 
 ## Источники
 
-- Реестр ведёт `python scripts/lit.py`: `find` ищет кандидатов в zbMATH, arXiv и журналах
+- Реестр ведёт `python scripts/sources/lit.py`: `find` ищет кандидатов в zbMATH, arXiv и журналах
   MathNet, `cites` обходит цитирования, `add` добавляет работу по идентификатору arXiv,
   `mathnet:…` или DOI, `search` и `show` ищут по полным текстам. Те же действия есть у
   MCP-сервера `lit`. Подробности — `sources/README.md`.
@@ -124,7 +124,7 @@
 
 Таблица ниже — список ролей проекта: их состав, место записи и порядок вызова. В
 `README.md` он не повторяется; что получил Harness, показывает
-`python scripts/harness.py list`.
+`python scripts/host/harness.py list`.
 
 | Агент | Задача | Куда пишет |
 | --- | --- | --- |
@@ -189,7 +189,7 @@
 
 ## Проверки и отчёт
 
-- `python scripts/proj.py check` проверяет шапки записей и ссылки между ними, запрещённое
+- `python scripts/state/proj.py check` проверяет шапки записей и ссылки между ними, запрещённое
   в библиотеке, свежесть сводок, `lake build`, аксиомы всех объявлений из записей и
   устаревшие проверки соответствия. С ключом `--fast` Lean не запускается.
 - `python -m unittest discover tests` проверяет сами инструменты.

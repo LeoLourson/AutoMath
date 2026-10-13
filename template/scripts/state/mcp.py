@@ -2,7 +2,12 @@
 # requires-python = ">=3.11"
 # dependencies = ["mcp>=1.2,<2"]
 # ///
-"""MCP-сервер проекта: записи, идеи, сводки, проверки и формулировки Lean из scripts/proj.py."""
+"""MCP-сервер проекта: записи, идеи, сводки, проверки и формулировки Lean.
+
+Запускается из корня проекта: `uv run --directory . --script scripts/state/mcp.py`.
+Каталог скриптов попадает в sys.path при загрузке этого файла, корень проекта — из
+`--directory`.
+"""
 import contextlib
 import functools
 import sys
@@ -10,7 +15,8 @@ from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import proj  # noqa: E402
 
 server = FastMCP('proj', instructions=(
@@ -71,7 +77,7 @@ def check(lean: bool = False) -> str:
     """Проверки проекта: шапки записей, ссылки между ними, запрещённое в библиотеке, свежесть сводок.
 
     lean=True добавляет lake build и аудит аксиом; на большой библиотеке это минуты, тогда удобнее
-    `python scripts/proj.py check` из командной строки.
+    `python scripts/state/proj.py check` из командной строки.
     """
     return '\n'.join(proj.check(fast=not lean)[1])
 

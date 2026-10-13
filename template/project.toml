@@ -11,6 +11,6 @@ allowed_axioms = ["propext", "Classical.choice", "Quot.sound"]
 main = "paper/main.tex"
 
 [sources]
-# Хосты, до которых трафик из VPN-туннеля не доходит. К ним scripts/lit.py идёт с адреса
+# Хосты, до которых трафик из VPN-туннеля не доходит. К ним scripts/sources/lit.py идёт с адреса
 # другого сетевого интерфейса, то есть мимо VPN. Пустой список отключает обход.
 direct_hosts = ["mathnet.ru"]

@@ -12,10 +12,12 @@ from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parents[2] / 'template'
 sys.path.insert(0, str(TEMPLATE / 'scripts'))
-import leandecl  # noqa: E402
-import lit  # noqa: E402
-import proj  # noqa: E402
 import records  # noqa: E402
+from check import declarations as leandecl  # noqa: E402
+from check import hygiene  # noqa: E402
+from check import results as checks  # noqa: E402
+from sources import lit  # noqa: E402
+from state import proj  # noqa: E402
 
 
 def _as_template() -> Path:
@@ -141,7 +143,7 @@ class ProjectRecords(unittest.TestCase):
         proj.set_field('R01', 'depends', 'R02')
         proj.set_field('R02', 'lean', 'Demo.const_even, Demo.absent')
         proj.set_field('R02', 'sources', 'S3')
-        errors, _ = proj.check_records(proj.docs('results', 'R'), {'S1'}, set(), self.index)
+        errors, _ = checks.check_records(self.root, proj.docs('results', 'R'), {'S1'}, set(), self.index)
         text = '\n'.join(errors)
         for expected in ('несуществующей записи R07', 'цикл зависимостей', 'Demo.absent нет в библиотеке',
                          'источника S3 нет'):
@@ -150,14 +152,14 @@ class ProjectRecords(unittest.TestCase):
     def test_fidelity_goes_stale(self):
         proj.new('result', 'Чётность постоянной')
         proj.set_field('R01', 'lean', 'Demo.const_even')
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), self.index)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
         self.assertIn('соответствие формализации не проверено', '\n'.join(warnings))
-        mark = proj.record_fingerprint(self.index, ['Demo.const_even'])
+        mark = leandecl.record_fingerprint(self.index, ['Demo.const_even'])
         proj.set_field('R01', 'fidelity', f'2026-01-01 соответствует {mark}')
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), self.index)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
         self.assertEqual(warnings, [])
         changed = {d.name: d for d in leandecl.parse(LEAN.replace('f (-x) = f x', 'f (-x) = -f x'))}
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), changed)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), changed)
         self.assertIn('изменились после проверки соответствия', '\n'.join(warnings))
 
     def test_views_are_built_from_headers(self):
@@ -171,11 +173,11 @@ class ProjectRecords(unittest.TestCase):
         self.assertIn('| [I01](I01.md) | Попробовать индукцию | R02 | новая |', views['ideas/README.md'])
 
     def test_hygiene_ignores_comments(self):
-        errors, _ = proj.hygiene()
+        errors, _ = hygiene.check_hygiene(self.root, 'Demo')
         self.assertEqual(errors, [])
         path = self.root / 'Demo' / 'Basic.lean'
         path.write_text(LEAN.replace('fun _ => rfl', 'by sorry'), encoding='utf-8')
-        errors, _ = proj.hygiene()
+        errors, _ = hygiene.check_hygiene(self.root, 'Demo')
         self.assertEqual(len(errors), 1)
         self.assertIn('sorry', errors[0])
 

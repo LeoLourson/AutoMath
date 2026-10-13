@@ -18,7 +18,7 @@ jobs:
         run: python3 -m unittest discover tests
       - name: DeepSeek Harness artifacts
         run: |
-          python3 scripts/harness.py prepare
-          python3 scripts/harness.py check
+          python3 scripts/host/harness.py prepare
+          python3 scripts/host/harness.py check
       - name: Project checks
-        run: python3 scripts/proj.py check
+        run: python3 scripts/state/proj.py check

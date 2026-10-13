@@ -6,11 +6,11 @@
     },
     "lit": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/lit_mcp.py"]
+      "args": ["run", "--directory", ".", "--script", "scripts/sources/mcp.py"]
     },
     "proj": {
       "command": "uv",
-      "args": ["run", "--script", "scripts/proj_mcp.py"]
+      "args": ["run", "--directory", ".", "--script", "scripts/state/mcp.py"]
     }
   }
 }

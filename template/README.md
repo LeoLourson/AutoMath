@@ -8,22 +8,22 @@
 
 1. `lake exe cache get`, затем `lake build`: загрузка готовой сборки Mathlib и сборка
    библиотеки `__LIB__`.
-2. `python scripts/proj.py doctor` — проверка окружения. Первый запуск MCP-серверов `lit`
+2. `python scripts/state/proj.py doctor` — проверка окружения. Первый запуск MCP-серверов `lit`
    и `proj` ставит зависимости через `uv`; чтобы не ждать этого в редакторе, один раз
-   выполните `uv run scripts/lit.py list`.
+   выполните `uv run scripts/sources/lit.py list`.
 3. Заполните `question.md` и `PROJECT.md`.
-4. `python scripts/proj.py check` — должно пройти с одним замечанием о примере.
+4. `python scripts/state/proj.py check` — должно пройти с одним замечанием о примере.
 5. Удалите пример: запись `results/R01.md` и теорему `sq_add` из `__LIB__/Basic.lean`,
-   затем `python scripts/proj.py sync`.
+   затем `python scripts/state/proj.py sync`.
 
 Дальше работа идёт командами: `/sources тема` собирает литературу, `/ideas` предлагает
 и проверяет подходы, `/day` ведёт ежедневный цикл.
 
-Для DeepSeek Harness: `python scripts/harness.py run web`, затем выберите папку проекта,
+Для DeepSeek Harness: `python scripts/host/harness.py run web`, затем выберите папку проекта,
 preset Standard и модель в интерфейсе. Адаптер подключит роли, skills и MCP.
 Нужны Node.js 22.19+ (ветка 22) или 24+ и npm; подробности — [DEEPSEEK.md](DEEPSEEK.md).
 Команды, роли и навыки Harness собираются из `.claude/`; их список печатает
-`python scripts/harness.py list`.
+`python scripts/host/harness.py list`.
 Можно также работать в Claude Code с прежними настройками.
 
 ## Файлы
@@ -50,13 +50,13 @@ preset Standard и модель в интерфейсе. Адаптер подк
 
 Команды и роли — в `AGENTS.md`: там их состав, куда каждая роль пишет и что запускает.
 В Harness те же команды приходят нативными skills, их список печатает
-`python scripts/harness.py list`.
+`python scripts/host/harness.py list`.
 
 ## Проверки
 
 ```
-python scripts/proj.py check          # всё, включая lake build и аксиомы
-python scripts/proj.py check --fast   # без Lean
+python scripts/state/proj.py check          # всё, включая lake build и аксиомы
+python scripts/state/proj.py check --fast   # без Lean
 python -m unittest discover tests     # сами инструменты
 ```
 

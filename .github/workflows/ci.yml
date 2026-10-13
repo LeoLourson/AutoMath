@@ -33,6 +33,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: python template/scripts/harness.py prepare
-      - run: npm install --prefix "$RUNNER_TEMP/research-dsh" "$(python template/scripts/harness.py package)"
+      - run: python template/scripts/host/harness.py prepare
+      - run: npm install --prefix "$RUNNER_TEMP/research-dsh" "$(python template/scripts/host/harness.py package)"
       - run: node tests/template/harness_runtime.mjs "$RUNNER_TEMP/research-dsh/node_modules"
