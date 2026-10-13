@@ -122,9 +122,9 @@ python create.py --update ../Spectra
 сгенерированного: `python scripts/harness.py run web -- --patch /path/to/local.yml`.
 Адаптер не переносит разрешения Claude и не меняет глобальные настройки Harness.
 Права задаются в Harness; ограничения мест записи в ролях являются инструкциями.
-MCP с `env`/`headers` настраиваются отдельным Cordis patch, чтобы не размножать секреты.
-Для такого сервера отметьте запись в `.mcp.json` как `disabled: true` и включите её
-локальным patch. Поддерживаются stdio и HTTP; SSE не конвертируется.
+Поле `env` stdio-сервера копируется в patch, который лежит в `output/` вне Git; ключи в
+`.mcp.json` не храните. HTTP-сервер с `headers` настраивается отдельным Cordis patch:
+отметьте запись в `.mcp.json` как `disabled: true` и включите её локальным patch. Поддерживаются stdio и HTTP; SSE не конвертируется.
 
 ## Проверка
 

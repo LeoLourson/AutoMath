@@ -39,7 +39,8 @@ CLAUDE_MODELS = ('opus', 'sonnet', 'haiku')
 DELEGATING = {'Agent', 'Task'}
 
 PROJECT_NOTE = 'Рабочая папка — корень этого исследовательского проекта.'
-READ_NOTE = 'Перед работой прочитай AGENTS.md и PROJECT.md из корня проекта.'
+# Файлы правил проекта; в указание «прочитай» попадают те, что есть в проекте.
+RULES = ('AGENTS.md', 'PROJECT.md')
 DELEGATION = """Роли вызываются инструментами research_*; каждый вызов создаёт нового агента без
 истории родителя. Передавай проверяющему только файлы и предмет проверки, без
 рассуждений автора. Вызов возвращает id; дождись отчёта и проверь записанный файл
@@ -116,6 +117,11 @@ def tool_list(fields: dict) -> list[str] | None:
     return [item.strip() for item in str(fields['tools']).split(',') if item.strip()]
 
 
+def read_note(root: Path) -> str:
+    found = [name for name in RULES if (root / name).is_file()]
+    return f'Перед работой прочитай {" и ".join(found)} из корня проекта.'
+
+
 def mcp_note(servers: list[str]) -> list[str]:
     return ['MCP: ' + ', '.join(f'mcp__{name}__*' for name in servers) + '.'] if servers else []
 
@@ -169,7 +175,7 @@ def unported(root: Path) -> list[str]:
     return notes
 
 
-def skill_files(agents: dict, skills: dict, servers: list[str]) -> dict[Path, bytes]:
+def skill_files(root: Path, agents: dict, skills: dict, servers: list[str]) -> dict[Path, bytes]:
     # Self-ignoring directory also works in projects upgraded from older templates.
     result: dict[Path, bytes] = {Path('.dsh/skills/.gitignore'): b'*\n'}
     by_paths: dict[str, list[str]] = {}
@@ -185,7 +191,7 @@ def skill_files(agents: dict, skills: dict, servers: list[str]) -> dict[Path, by
             header['whenToUse'] = f'При работе с файлами {fields["paths"]}.'
         lines = host_notes(body)
         if is_workflow(source, fields):
-            lines = [PROJECT_NOTE + ' ' + READ_NOTE, *roster(agents), *mcp_note(servers), *scoped, *lines, COMMON]
+            lines = [PROJECT_NOTE + ' ' + read_note(root), *roster(agents), *mcp_note(servers), *scoped, *lines, COMMON]
         prefix = '\n'.join(lines) + '\n\n' if lines else ''
         yaml = '\n'.join(f'{k}: {json.dumps(v, ensure_ascii=False)}' for k, v in header.items())
         result[Path('.dsh/skills') / name / 'SKILL.md'] = (
@@ -198,11 +204,11 @@ def skill_files(agents: dict, skills: dict, servers: list[str]) -> dict[Path, by
     return result
 
 
-def persona(name: str, agents: dict, servers: list[str]) -> str:
+def persona(root: Path, name: str, agents: dict, servers: list[str]) -> str:
     """Role instructions; the restrictions come from the Claude Code frontmatter of the role."""
     _, fields, body = agents[name]
     tools = tool_list(fields)
-    lines = [PROJECT_NOTE if fields.get('omitClaudeMd') is True else PROJECT_NOTE + ' ' + READ_NOTE]
+    lines = [PROJECT_NOTE if fields.get('omitClaudeMd') is True else PROJECT_NOTE + ' ' + read_note(root)]
     if tools is None or DELEGATING & set(tools):
         lines += roster(agents, skip=name)
     else:
@@ -235,9 +241,9 @@ def mcp_entries(root: Path) -> list[dict]:
             config.update(transport='stdio', command=original['command'], args=original.get('args', []))
             cwd = Path(original.get('cwd', str(root)))
             config['cwd'] = str((root / cwd).resolve())
+            # The patch stays in the ignored output/; headers below are still refused.
             if original.get('env'):
-                raise ValueError(f'MCP {name}: env храните в отдельном локальном Cordis patch; '
-                                 'адаптер не копирует секреты из .mcp.json')
+                config['env'] = original['env']
         elif transport in ('http', 'streamable-http'):
             config.update(transport='streamable-http', url=original['url'])
             if original.get('headers'):
@@ -250,19 +256,18 @@ def mcp_entries(root: Path) -> list[dict]:
 
 def artifacts(root: Path) -> dict[Path, bytes]:
     root = root.resolve()
-    for required in ('AGENTS.md', 'PROJECT.md', 'project.toml'):
-        if not (root / required).is_file():
-            raise ValueError(f'Нет {root / required}; укажите корень созданного проекта')
+    if not (root / RULES[0]).is_file():
+        raise ValueError(f'Нет {root / RULES[0]}; укажите корень проекта')
     agents, skills = sources(root)
     entries = mcp_entries(root)
     servers = [entry['config']['serverName'] for entry in entries]
-    result = skill_files(agents, skills, servers)
+    result = skill_files(root, agents, skills, servers)
     for name in agents:
         entries.append({
             'id': f'research-role-{name}',
             'name': '@deepseek-ai/dsh-tool-subagent',
             'config': {'provider': 'spawn', 'toolName': role_tool(name),
-                       'maxDepth': 2, 'persona': persona(name, agents, servers)},
+                       'maxDepth': 2, 'persona': persona(root, name, agents, servers)},
         })
     # A private provider makes skills discoverable even with --no-git or when the
     # project is nested inside another checkout. Avoid duplicate default-root scans.
