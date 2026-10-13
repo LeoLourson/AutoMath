@@ -1,4 +1,7 @@
-"""Generator and upgrade regression tests; no network, Git initialization or Lean."""
+"""Generator and upgrade regression tests; no network, Git initialization or Lean.
+
+    python -m unittest discover -s tests/kit
+"""
 import contextlib
 import importlib.util
 import io
@@ -7,8 +10,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
-spec = importlib.util.spec_from_file_location('create_project', REPO / 'create.py')
+REPO = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location('create_project', REPO / 'tools/create.py')
 create_project = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(create_project)
 

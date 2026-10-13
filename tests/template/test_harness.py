@@ -14,7 +14,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-PROJECT = Path(__file__).resolve().parent.parent
+PROJECT = Path(__file__).resolve().parents[2] / 'template'
 sys.path.insert(0, str(PROJECT / 'scripts'))
 import harness
 

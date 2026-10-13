@@ -14,18 +14,19 @@ import subprocess
 import sys
 import tarfile
 import tomllib
-from dataclasses import dataclass
-from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import leandecl  # noqa: E402
+import records  # noqa: E402
 
-RESULT_STATUS = ['цель', 'набросок', 'доказано', 'опровергнуто']
-IDEA_STATUS = ['новая', 'выдержала критику', 'в работе', 'отвергнута', 'перенесена']
+RESULT_STATUS = records.RESULT_STATUS
+IDEA_STATUS = records.IDEA_STATUS
 DEFAULT_AXIOMS = ['propext', 'Classical.choice', 'Quot.sound']
 
-ROOT = Path(__file__).resolve().parent.parent
+# Корень проекта подставляется из project.toml; подчёркивание отличает это имя от
+# модульной переменной `ROOT`, по которой records строит пути записей.
+_ROOT = Path(__file__).resolve().parent.parent
 LIB = ''
 AXIOMS: set[str] = set()
 PAPER = 'paper/main.tex'
@@ -33,215 +34,39 @@ PAPER = 'paper/main.tex'
 
 def configure(root: Path) -> None:
     """Читает project.toml; тесты вызывают с временным каталогом."""
-    global ROOT, LIB, AXIOMS, PAPER
-    ROOT = Path(root)
-    config = tomllib.loads((ROOT / 'project.toml').read_text(encoding='utf-8'))
+    global _ROOT, LIB, AXIOMS, PAPER
+    _ROOT = Path(root)
+    config = tomllib.loads((_ROOT / 'project.toml').read_text(encoding='utf-8'))
     LIB = config['project']['lib']
     AXIOMS = set(config.get('lean', {}).get('allowed_axioms', DEFAULT_AXIOMS))
     PAPER = config.get('paper', {}).get('main', PAPER)
 
 
-# ---------- записи с шапкой ----------
-
-@dataclass
-class Doc:
-    path: Path
-    meta: dict
-    body: str
-
-    @property
-    def id(self) -> str:
-        return re.match(r'[A-Z]+\d+', self.path.stem).group(0)
-
-    def many(self, key: str) -> list[str]:
-        value = self.meta.get(key) or []
-        return value if isinstance(value, list) else [value]
-
-
-def read_doc(path: Path) -> Doc:
-    text = path.read_text(encoding='utf-8').replace('\r\n', '\n')
-    if not text.startswith('---\n'):
-        return Doc(path, {}, text)
-    head, _, body = text[4:].partition('\n---\n')
-    meta: dict = {}
-    for line in head.split('\n'):
-        key, colon, value = line.partition(':')
-        if not colon or not key.strip() or key.lstrip().startswith('#'):
-            continue
-        value = value.strip()
-        meta[key.strip()] = [item.strip() for item in value[1:-1].split(',') if item.strip()] \
-            if value.startswith('[') and value.endswith(']') else value
-    return Doc(path, meta, body)
-
-
-def write_doc(doc: Doc) -> None:
-    lines = [f"{key}: [{', '.join(value)}]" if isinstance(value, list) else f'{key}: {value}'.rstrip()
-             for key, value in doc.meta.items()]
-    doc.path.write_text('---\n' + '\n'.join(lines) + '\n---\n' + doc.body, encoding='utf-8', newline='\n')
-
-
-def docs(folder: str, prefix: str) -> list[Doc]:
-    paths = [path for path in (ROOT / folder).glob(f'{prefix}*.md') if re.fullmatch(rf'{prefix}\d+', path.stem)]
-    return [read_doc(path) for path in sorted(paths, key=lambda path: int(path.stem[len(prefix):]))]
-
-
-def find_doc(ident: str) -> Doc:
-    folder = {'R': 'results', 'I': 'ideas', 'S': 'sources/cards'}.get(ident[:1].upper())
-    path = ROOT / (folder or '') / f'{ident.upper()}.md'
-    if not folder or not path.exists():
-        raise SystemExit(f'Нет записи {ident}.')
-    return read_doc(path)
+# Общий разбор записей живёт в records.py; здесь только привязка к корню проекта.
+Doc = records.Doc
 
 
 def rel(path: Path) -> str:
-    return path.relative_to(ROOT).as_posix()
+    return records.rel(_ROOT, path)
 
 
-# ---------- заготовки ----------
+def find_doc(ident: str) -> Doc:
+    return records.find_doc(_ROOT, ident)
 
-STUBS = {
-    'result': ('results', 'R', '''---
-id: {id}
-title: {title}
-status: цель
-depends: [{depends}]
-sources: []
-lean: []
-review:
-fidelity:
----
 
-## Утверждение
-
-Точная формулировка: объекты, гипотезы, вывод, область определения.
-
-## Доказательство
-
-Пока нет.
-
-## Границы
-
-Что утверждение не покрывает; какие гипотезы существенны и почему.
-'''),
-    'idea': ('ideas', 'I', '''---
-id: {id}
-title: {title}
-target: {target}
-status: новая
-created: {today}
-critic:
----
-
-## Формулировка
-
-Гипотезы, вывод, область определения.
-
-## Набросок
-
-Шаги по одному. У каждого шага опора: запись R…, карточка источника S…, стандартный факт
-с названием или «пробел».
-
-## Чем убить
-
-Самая дешёвая проверка, которая опровергла бы идею: частный случай, расчёт, известный пример.
-
-## Следующий шаг
-'''),
-    'card': ('sources/cards', 'S', '''---
-source: {id}
-verified:
----
-
-# {id}. {title}
-
-## Теорема N, с. P
-
-**Гипотезы.** Все, включая соглашения раздела и статьи («всюду далее …»).
-
-**Вывод.**
-
-**Определения, от которых зависит формулировка.** Как они даны в этой работе.
-
-**Применимость.** Где используется (R…) и как там проверена каждая гипотеза.
-'''),
-}
-
-EXPERIMENT = '''---
-id: {id}
-title: {title}
-idea: {idea}
-status: начат
----
-
-## Вопрос
-
-Что проверяем и какой исход опроверг бы гипотезу.
-
-## Запуск
-
-`uv run experiments/{id}/run.py`
-
-## Проверка метода
-
-Случай с известным ответом и расхождение с ним.
-
-## Результат
-
-Таблица чисел с оценкой погрешности. Вывод — «согласуется» или «не согласуется», не «доказано».
-'''
-
-RUN_PY = '''# /// script
-# requires-python = ">=3.11"
-# dependencies = ["numpy", "scipy", "mpmath", "sympy"]
-# ///
-"""{title}"""
-'''
+def docs(folder: str, prefix: str) -> list[Doc]:
+    return records.docs(_ROOT, folder, prefix)
 
 
 def new(kind: str, title: str, **fields) -> Path:
-    """Создаёт запись со следующим свободным номером; номер занимается созданием файла."""
-    if kind == 'experiment':
-        folder, prefix = ROOT / 'experiments', 'E'
-        taken = [int(path.name[1:]) for path in folder.glob('E*') if re.fullmatch(r'E\d+', path.name)]
-    else:
-        subfolder, prefix, stub = STUBS[kind]
-        folder = ROOT / subfolder
-        taken = [int(path.stem[1:]) for path in folder.glob(f'{prefix}*.md') if re.fullmatch(rf'{prefix}\d+', path.stem)]
-    folder.mkdir(parents=True, exist_ok=True)
-    if kind == 'card':
-        path = folder / f"{fields['source']}.md"
-        with path.open('x', encoding='utf-8', newline='\n') as handle:
-            handle.write(stub.format(id=fields['source'], title=title))
-        return path
-    number = max(taken, default=0) + 1
-    while True:
-        ident = f'{prefix}{number:02d}'
-        try:
-            if kind == 'experiment':
-                (folder / ident).mkdir()
-                (folder / ident / 'README.md').write_text(
-                    EXPERIMENT.format(id=ident, title=title, idea=fields.get('idea', '')), encoding='utf-8', newline='\n')
-                (folder / ident / 'run.py').write_text(RUN_PY.format(title=title), encoding='utf-8', newline='\n')
-                return folder / ident / 'README.md'
-            path = folder / f'{ident}.md'
-            with path.open('x', encoding='utf-8', newline='\n') as handle:
-                handle.write(stub.format(id=ident, title=title, today=f'{date.today():%Y-%m-%d}',
-                                         depends=fields.get('depends', ''), target=fields.get('target', '')))
-            return path
-        except FileExistsError:
-            number += 1
+    return records.create(_ROOT, kind, title, **fields)
 
 
 def set_field(ident: str, key: str, value: str) -> str:
-    doc = find_doc(ident)
     vocabulary = {'R': RESULT_STATUS, 'I': IDEA_STATUS}.get(ident[:1].upper())
     if key == 'status' and vocabulary and value not in vocabulary:
         raise SystemExit(f'Статус «{value}» не из списка: {", ".join(vocabulary)}.')
-    old = doc.meta.get(key)
-    many = isinstance(old, list) or key in ('depends', 'sources', 'lean')
-    doc.meta[key] = [item.strip() for item in value.split(',') if item.strip()] if many else value
-    write_doc(doc)
-    return f'{doc.id}: {key} = {value}'
+    return records.save_doc(_ROOT, ident, key, value)
 
 
 # ---------- Lean ----------
@@ -258,12 +83,12 @@ def lake() -> str:
 
 def run(command: list[str], timeout: int = 3600) -> tuple[int, str]:
     # stdin закрыт: под MCP-сервером дочерний процесс иначе наследует его канал и на Windows зависает
-    done = subprocess.run(command, cwd=ROOT, capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL)
+    done = subprocess.run(command, cwd=_ROOT, capture_output=True, timeout=timeout, stdin=subprocess.DEVNULL)
     return done.returncode, (done.stdout + done.stderr).decode('utf-8', 'replace')
 
 
 def lean_files() -> list[Path]:
-    return sorted((ROOT / LIB).rglob('*.lean')) + [ROOT / f'{LIB}.lean']
+    return sorted((_ROOT / LIB).rglob('*.lean')) + [_ROOT / f'{LIB}.lean']
 
 
 def hygiene() -> tuple[list[str], list[str]]:
@@ -292,7 +117,7 @@ def audit(names: list[str]) -> list[str]:
     """Проверяет в Lean, что объявления существуют и зависят только от разрешённых аксиом."""
     if not names:
         return []
-    target = ROOT / 'output' / 'Audit.lean'
+    target = _ROOT / 'output' / 'Audit.lean'
     target.parent.mkdir(exist_ok=True)
     target.write_text(f'import {LIB}\n' + ''.join(f'#print axioms {name}\n' for name in names),
                       encoding='utf-8', newline='\n')
@@ -390,9 +215,9 @@ def check_ideas(ideas: list[Doc], records: set[str]) -> tuple[list, list]:
 def registry() -> tuple[set[str], set[str], set[str]]:
     """Коды источников реестра; коды с карточкой; коды с карточкой, сверенной по PDF."""
     import json
-    path = ROOT / 'sources' / 'papers.json'
+    path = _ROOT / 'sources' / 'papers.json'
     codes = {row['code'] for row in json.loads(path.read_text(encoding='utf-8'))} if path.exists() else set()
-    cards = [read_doc(card) for card in (ROOT / 'sources' / 'cards').glob('S*.md')]
+    cards = [records.read_doc(card) for card in (_ROOT / 'sources' / 'cards').glob('S*.md')]
     return (codes, {card.path.stem for card in cards},
             {card.path.stem for card in cards if card.meta.get('verified')})
 
@@ -401,13 +226,13 @@ def check(fast: bool) -> tuple[int, list[str]]:
     errors, warnings, passed = [], [], []
     for required in ('AGENTS.md', 'PROJECT.md', 'question.md', 'project.toml', 'lakefile.toml', 'lean-toolchain',
                      f'{LIB}.lean', 'sources/papers.json', '.gitignore'):
-        if not (ROOT / required).exists():
+        if not (_ROOT / required).exists():
             errors.append(f'нет файла {required}')
-    lakefile = (ROOT / 'lakefile.toml').read_text(encoding='utf-8') if (ROOT / 'lakefile.toml').exists() else ''
+    lakefile = (_ROOT / 'lakefile.toml').read_text(encoding='utf-8') if (_ROOT / 'lakefile.toml').exists() else ''
     if f'name = "{LIB}"' not in lakefile:
         errors.append(f'lakefile.toml не объявляет библиотеку {LIB} из project.toml')
 
-    index = leandecl.library(ROOT, LIB)
+    index = leandecl.library(_ROOT, LIB)
     records, ideas = docs('results', 'R'), docs('ideas', 'I')
     sources, carded, verified = registry()
     for found_errors, found_warnings in (check_records(records, sources, carded, index, verified),
@@ -419,11 +244,11 @@ def check(fast: bool) -> tuple[int, list[str]]:
                   f'объявлений Lean: {len(index)}')
 
     for name, text in views(records, ideas, index).items():
-        current = (ROOT / name).read_text(encoding='utf-8').replace('\r\n', '\n') if (ROOT / name).exists() else ''
+        current = (_ROOT / name).read_text(encoding='utf-8').replace('\r\n', '\n') if (_ROOT / name).exists() else ''
         if current != text:
             errors.append(f'{name} устарел: python scripts/proj.py sync')
 
-    if not (ROOT / '.git').exists():
+    if not (_ROOT / '.git').exists():
         warnings.append('каталог не под Git: git init')
     else:
         code, output = run(['git', 'check-ignore', 'output/probe'])
@@ -484,7 +309,7 @@ def views(records: list[Doc], ideas: list[Doc], index: dict) -> dict[str, str]:
         edges += [f'  {dep} --> {doc.id}' for dep in doc.many('depends')]
     modules = []
     for path in lean_files():
-        if path.exists() and path.parent != ROOT:
+        if path.exists() and path.parent != _ROOT:
             found = re.search(r'/-!\s*#*\s*([^\n]*)', path.read_text(encoding='utf-8'))
             modules.append(f"| `{rel(path)}` | {cell(found.group(1).strip() if found else '')} |")
     blueprint = '\n'.join([
@@ -512,14 +337,17 @@ def views(records: list[Doc], ideas: list[Doc], index: dict) -> dict[str, str]:
 
 
 def sync() -> list[str]:
-    index = leandecl.library(ROOT, LIB)
+    """Собирает сводки записей и каталог источников; каталог строит lit, а не этот файл."""
+    index = leandecl.library(_ROOT, LIB)
     written = []
     for name, text in views(docs('results', 'R'), docs('ideas', 'I'), index).items():
-        (ROOT / name).parent.mkdir(parents=True, exist_ok=True)
-        (ROOT / name).write_text(text, encoding='utf-8', newline='\n')
+        (_ROOT / name).parent.mkdir(parents=True, exist_ok=True)
+        (_ROOT / name).write_text(text, encoding='utf-8', newline='\n')
         written.append(name)
-    if (ROOT / 'sources' / 'papers.json').exists():
-        code, output = run([sys.executable, 'scripts/lit.py', 'catalog'])
+    if (_ROOT / 'sources' / 'papers.json').exists():
+        # sys.executable и путь рядом с этим файлом: то же окружение, что у proj.py.
+        catalog = Path(__file__).resolve().parent / 'lit.py'
+        code, output = run([sys.executable, str(catalog), 'catalog', '--root', str(_ROOT)])
         written.append('sources/catalog.md' if not code else 'sources/catalog.md не собран: ' + output[-200:])
     return written
 
@@ -528,11 +356,11 @@ def sync() -> list[str]:
 
 def tex(source: str) -> int:
     """Два прохода pdflatex в output/ и предупреждения из журнала."""
-    path = ROOT / source
+    path = _ROOT / source
     if not shutil.which('pdflatex'):
         print('pdflatex не найден.')
         return 1
-    (ROOT / 'output').mkdir(exist_ok=True)
+    (_ROOT / 'output').mkdir(exist_ok=True)
     for attempt in (1, 2):
         code, output = run(['pdflatex', '-interaction=nonstopmode', '-halt-on-error', '-file-line-error',
                             '-output-directory=output', source])
@@ -540,7 +368,7 @@ def tex(source: str) -> int:
             print(f'pdflatex не прошёл (проход {attempt}):')
             print('\n'.join(line for line in output.split('\n') if re.search(r':\d+: |^! ', line))[:1500])
             return 1
-    log = (ROOT / 'output' / (path.stem + '.log')).read_text(encoding='utf-8', errors='replace')
+    log = (_ROOT / 'output' / (path.stem + '.log')).read_text(encoding='utf-8', errors='replace')
     found = [line for line in log.split('\n') if re.search(r'undefined|Overfull|LaTeX Warning|Package .* Warning', line)]
     for line in found:
         print('замечание:', line.strip())
@@ -566,9 +394,9 @@ def doctor() -> int:
             __import__(module)
         except ImportError:
             lines.append(f'модуль {module}: нет — нужен scripts/lit.py; `uv run scripts/lit.py …` поставит сам')
-    toolchain = (ROOT / 'lean-toolchain').read_text(encoding='utf-8').strip()
+    toolchain = (_ROOT / 'lean-toolchain').read_text(encoding='utf-8').strip()
     lines.append(f'lean-toolchain: {toolchain}; библиотека: {LIB}')
-    if not (ROOT / '.lake' / 'packages' / 'mathlib').exists():
+    if not (_ROOT / '.lake' / 'packages' / 'mathlib').exists():
         lines.append('Mathlib не загружен: lake exe cache get')
     print('\n'.join(lines))
     return 1 if bad else 0
@@ -579,14 +407,14 @@ def doctor() -> int:
 def aristotle_pack(name: str, skeleton: str) -> list[str]:
     """Пакет для Aristotle: библиотека, закреплённые версии и заготовка с sorry как новый модуль."""
     source = Path(skeleton)
-    source = source if source.is_absolute() else ROOT / source
-    package = ROOT / 'output' / 'aristotle' / name
+    source = source if source.is_absolute() else _ROOT / source
+    package = _ROOT / 'output' / 'aristotle' / name
     if package.exists():
         raise SystemExit(f'{rel(package)} уже есть: выберите другое имя.')
     (package / LIB).mkdir(parents=True)
     for item in ('lakefile.toml', 'lean-toolchain', 'lake-manifest.json', f'{LIB}.lean'):
-        shutil.copy2(ROOT / item, package / item)
-    shutil.copytree(ROOT / LIB, package / LIB, dirs_exist_ok=True)
+        shutil.copy2(_ROOT / item, package / item)
+    shutil.copytree(_ROOT / LIB, package / LIB, dirs_exist_ok=True)
     shutil.copy2(source, package / LIB / source.name)
     shutil.copy2(source, package / 'skeleton.lean')
     with (package / f'{LIB}.lean').open('a', encoding='utf-8', newline='\n') as root_file:
@@ -604,8 +432,8 @@ def aristotle_pack(name: str, skeleton: str) -> list[str]:
 
 def aristotle_accept(name: str, result: str) -> int:
     """Сверяет ответ с заготовкой: формулировки, sorry, axiom, изменённые файлы. Ничего не переносит."""
-    package = ROOT / 'output' / 'aristotle' / name
-    answer = Path(result) if Path(result).is_absolute() else ROOT / result
+    package = _ROOT / 'output' / 'aristotle' / name
+    answer = Path(result) if Path(result).is_absolute() else _ROOT / result
     if answer.is_file():
         folder = package.parent / (name + '-result')
         with tarfile.open(answer) as archive:
@@ -649,7 +477,7 @@ def create(kind: str, title: str, depends: str = '', target: str = '', idea: str
     if kind != 'card':
         return rel(new(kind, title, depends=depends, target=target, idea=idea))
     import json
-    rows = json.loads((ROOT / 'sources' / 'papers.json').read_text(encoding='utf-8'))
+    rows = json.loads((_ROOT / 'sources' / 'papers.json').read_text(encoding='utf-8'))
     row = next((row for row in rows if row['code'] == title.upper()), None)
     if row is None:
         raise SystemExit(f'Источника {title} нет в реестре.')
@@ -659,7 +487,7 @@ def create(kind: str, title: str, depends: str = '', target: str = '', idea: str
 
 def declarations(items: list[str]) -> tuple[dict, list]:
     """Объявления по полным именам или номерам записей; пустой список — все записи."""
-    index = leandecl.library(ROOT, LIB)
+    index = leandecl.library(_ROOT, LIB)
     names = []
     for item in items or [doc.id for doc in docs('results', 'R')]:
         names += find_doc(item).many('lean') if re.fullmatch(r'[Rr]\d+', item) else [item]
@@ -705,8 +533,9 @@ def overview() -> str:
 
 def main() -> int:
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    configure(ROOT)
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
+    parser.add_argument('--root', type=Path, default=_ROOT,
+                        help='корень проекта, по умолчанию каталог над scripts/')
     commands = parser.add_subparsers(dest='command', required=True)
     p = commands.add_parser('new', help='создать запись со следующим номером')
     p.add_argument('kind', choices=['result', 'idea', 'card', 'experiment'])
@@ -735,6 +564,7 @@ def main() -> int:
     p.add_argument('name')
     p.add_argument('file', help='pack: заготовка .lean с sorry; accept: архив или папка ответа')
     args = parser.parse_args()
+    configure(args.root)
 
     if args.command == 'new':
         print(create(args.kind, args.title, args.depends, args.target, args.idea))
