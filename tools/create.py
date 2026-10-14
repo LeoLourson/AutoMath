@@ -107,6 +107,16 @@ def update(target: Path, dry: bool) -> None:
     if extra:
         print('Есть в проекте, но не в шаблоне (свои или устаревшие; не удаляются):')
         print('\n'.join('  ' + name for name in extra))
+    # Команда и навык делят одно пространство имён: навык проекта с именем команды шаблона
+    # не даст собрать интеграцию.
+    commands = {Path(name).stem for name in known if name.startswith('.claude/commands/')}
+    clash = sorted(commands & {path.parent.name for path in (target / '.claude/skills').glob('*/SKILL.md')})
+    if clash:
+        message = ('Навык проекта носит имя команды шаблона: ' + ', '.join(clash) +
+                   '. Удалите папку .claude/skills/ИМЯ/ и повторите обновление.')
+        if not dry:
+            raise SystemExit(message)
+        print(message)
     if changed and not dry:
         print('Проверьте: python -m unittest discover tests; python scripts/state/proj.py check --fast')
     if not dry:

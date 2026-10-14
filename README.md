@@ -40,7 +40,9 @@ python tools/create.py --update ..\Spectra
 `scripts/`, `tests/`, `.claude/agents/`, `.claude/commands/`, `.claude/skills/`,
 `DEEPSEEK.md`, `sources/README.md`, `experiments/README.md`, CI. Постановка, записи, идеи,
 источники, библиотека Lean, статья, `.mcp.json` и `.claude/settings.json` не трогаются.
-Файлы, которых в шаблоне больше нет, команда перечисляет, но не удаляет.
+Файлы, которых в шаблоне больше нет, команда перечисляет, но не удаляет. Если в проекте
+лежит навык с именем команды шаблона, обновление останавливается и называет папку
+`.claude/skills/ИМЯ/`, которую нужно удалить: команды и навыки делят одно пространство имён.
 
 После обновления пересобираются производные `.dsh/skills/` и Cordis patch для Harness из
 актуальных инструкций и локальной `.mcp.json`. `--dry-run` ничего не пишет.
@@ -97,7 +99,7 @@ Python 3.11 или новее, `uv`, `elan` с `lake`, `git`; `pdflatex` — д�
 | `template/scripts/host/harness.py` | DeepSeek Harness: skills, роли и MCP из `.claude/` и `.mcp.json`, Cordis patch, запуск Web/Headless |
 | `template/DEEPSEEK.md` | запуск Harness, перенос воркфлоу Claude Code, проверки |
 | `template/.claude/agents/` | генератор идей, критик, экспериментатор, рецензент, формализатор, проверяющий соответствие, поиск по Mathlib, поиск литературы, транскрипция PDF, сверка карточек |
-| `template/.claude/commands/` | `/day`, `/ideas`, `/referee`, `/formalize`, `/fidelity`, `/sources`, `/transcribe` |
-| `template/.claude/skills/` | оформление текста: `paper-canvas`, `shkalikov-style`, `paper-de-ai`, `exposition`; набор и типографика LaTeX: `math-rigor` |
+| `template/.claude/commands/` | `/day`, `/ideas`, `/referee`, `/formalize`, `/fidelity`, `/sources`, `/transcribe`, `/exposition` |
+| `template/.claude/skills/` | слои математического текста: содержание — `math-rigor`, композиция — `paper-canvas`, стиль автора — `shkalikov-style`, язык — `paper-de-ai`, набор — `math-typeset` |
 | `tests/template/` | тесты инструментов без сети и без Lean; `harness_runtime.mjs` сверяет patch со схемами Harness |
 | `tests/kit/` | тесты создания и обновления проекта |

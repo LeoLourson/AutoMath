@@ -24,8 +24,11 @@ PATCH = Path('output/harness/cordis.patch.yml')
 MANIFEST = Path('output/harness/generated.json')
 # Поля шапки, которые Harness понимает сам; остальные поля Claude Code перечислены ниже.
 SKILL_FIELDS = {'name', 'description', 'whenToUse', 'disable-model-invocation', 'user-invocable'}
-# `paths` переносится в whenToUse, `argument-hint` — подсказка интерфейса Claude Code.
-SKILL_HANDLED = SKILL_FIELDS | {'paths', 'argument-hint'}
+# `when_to_use` и `paths` Claude Code дописываются к описанию навыка,
+# `argument-hint` — подсказка интерфейса Claude Code.
+SKILL_HANDLED = SKILL_FIELDS | {'when_to_use', 'paths', 'argument-hint'}
+# Каталог навыков Harness показывает модели имя и описание не длиннее этого числа знаков.
+CATALOG_LIMIT = 500
 # `tools` и `omitClaudeMd` переносятся в инструкции роли; модель наследуется от сессии.
 AGENT_HANDLED = {'name', 'description', 'tools', 'model', 'omitClaudeMd'}
 # Словарь среды Claude Code. От состава команд, ролей и навыков он не зависит.
@@ -187,8 +190,17 @@ def skill_files(root: Path, agents: dict, skills: dict, servers: list[str]) -> d
     for name, (source, fields, body) in skills.items():
         header = {k: v for k, v in fields.items() if k in SKILL_FIELDS}
         header['name'] = name
-        if fields.get('paths') and 'whenToUse' not in header:
-            header['whenToUse'] = f'При работе с файлами {fields["paths"]}.'
+        scope = f'При работе с файлами {fields["paths"]}.' if fields.get('paths') else ''
+        condition = ' '.join(part for part in (fields.get('when_to_use') or fields.get('whenToUse'), scope) if part)
+        if condition:
+            # Модель в Harness выбирает навык по имени и описанию из каталога; поле whenToUse
+            # ей не показывается и остаётся подписью для интерфейса.
+            header['whenToUse'] = condition
+            header['description'] = f'{fields["description"]} {condition}'
+        shown = len(' '.join(header['description'].split()))
+        if fields.get('disable-model-invocation') is not True and shown > CATALOG_LIMIT:
+            raise ValueError(f'{source}: описание вместе с условием применения занимает {shown} знаков; '
+                             f'каталог Harness показывает модели первые {CATALOG_LIMIT}')
         lines = host_notes(body)
         if is_workflow(source, fields):
             lines = [PROJECT_NOTE + ' ' + read_note(root), *roster(agents), *mcp_note(servers), *scoped, *lines, COMMON]

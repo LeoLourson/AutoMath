@@ -1,8 +1,9 @@
 """Проверка компиляции LaTeX-фрагмента без преамбулы.
 
-    python check_fragment.py fragment.tex [--keep ПАПКА]
+    python "ПУТЬ/check_fragment.py" "ПУТЬ/fragment.tex" [--keep "ПАПКА"]
 
-Фрагмент оборачивается в преамбулу с пакетами amsmath, amssymb, amsthm, mathtools, hyperref
+Пути берутся в кавычки: в них бывают пробелы. Файл фрагмента и папку --keep держат во
+временном каталоге, вне дерева проекта. Фрагмент оборачивается в преамбулу с пакетами amsmath, amssymb, amsthm, mathtools, hyperref
 и окружениями theorem, lemma, proposition, corollary, definition, remark, example, затем
 дважды собирается pdflatex во временной папке. Номера строк в сообщениях — строки
 фрагмента. Код возврата 0, если нет ошибок и неразрешённых ссылок.

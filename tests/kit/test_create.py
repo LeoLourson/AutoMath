@@ -58,6 +58,20 @@ class ProjectGeneration(unittest.TestCase):
             create_project.update(self.root, True)
         self.assertEqual(self.snapshot(), before)
 
+    def test_update_stops_on_a_project_skill_named_like_a_template_command(self):
+        command = sorted((create_project.TEMPLATE / '.claude/commands').glob('*.md'))[0].stem
+        skill = self.root / '.claude/skills' / command / 'SKILL.md'
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f'---\nname: {command}\ndescription: Свой навык\n---\nТекст.\n', encoding='utf-8')
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            create_project.update(self.root, True)
+        self.assertIn(f'Навык проекта носит имя команды шаблона: {command}', output.getvalue())
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as stopped:
+            create_project.update(self.root, False)
+        self.assertIn(command, str(stopped.exception))
+        self.assertTrue(skill.is_file())
+
     def test_upgrade_adds_deepseek_and_preserves_research_and_user_settings(self):
         owned = ('question.md', 'PROJECT.md', 'project.toml', 'paper/main.tex',
                  'results/R01.md', 'Spectra/Basic.lean', 'lean-toolchain', 'lake-manifest.json',
