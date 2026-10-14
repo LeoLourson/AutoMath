@@ -11,8 +11,8 @@ Harness пока меняет интерфейсы между версиями.
 Git; для статьи — `pdflatex`. Запускайте команды из папки созданного проекта.
 
 ```sh
-python scripts/harness.py prepare
-python scripts/harness.py run web
+python scripts/host/harness.py prepare
+python scripts/host/harness.py run web
 ```
 
 `prepare` работает без сети и ключей. `run` сначала обновляет производные файлы,
@@ -24,13 +24,13 @@ python scripts/harness.py run web
 Для запуска сервера без открытия браузера:
 
 ```sh
-python scripts/harness.py run web -- --no-open
+python scripts/host/harness.py run web -- --no-open
 ```
 
 Для одной задачи (провайдер и модель уже настроены в Harness):
 
 ```sh
-python scripts/harness.py run headless -- "Прочитай AGENTS.md и PROJECT.md и проверь состояние проекта"
+python scripts/host/harness.py run headless -- "Прочитай AGENTS.md и PROJECT.md и проверь состояние проекта"
 ```
 
 Эквивалентный прямой запуск после `prepare`:
@@ -51,7 +51,7 @@ Harness получает то же, что Claude Code: адаптер чита�
 `.mcp.json` при каждой подготовке. Текущий список печатает команда
 
 ```sh
-python scripts/harness.py list
+python scripts/host/harness.py list
 ```
 
 Команды помечены в нём косой чертой, навыки с пометкой «только по вызову пользователя»
@@ -68,7 +68,7 @@ MCP-серверы в корне проекта; вызов MCP может за�
 ## Как переносится воркфлоу Claude Code
 
 Новая команда, роль, навык или MCP-сервер попадают в Harness после `prepare` (его
-вызывают `run` и `tools/create.py --update` из папки шаблона). В `scripts/harness.py`,
+вызывают `run` и `tools/create.py --update` из папки шаблона). В `scripts/host/harness.py`,
 тестах и этом файле их имён нет, править там нечего.
 
 | В Claude Code | В Harness |
@@ -76,7 +76,9 @@ MCP-серверы в корне проекта; вызов MCP может за�
 | `.claude/commands/NAME.md` | skill `NAME` в `.dsh/skills/`; в начало добавлены правила вызова ролей, список ролей с описаниями и имена MCP |
 | `.claude/skills/NAME/` | skill `NAME` вместе со справочниками и скриптами |
 | `disable-model-invocation: true` у навыка | поле сохраняется; такой навык получает то же начало, что команда |
-| `paths` у навыка | поле `whenToUse` с маской файлов; команды получают строку «перед правкой таких файлов загрузи эти skills» |
+| `description` у навыка | строка каталога навыков: модель выбирает навык по имени и первым 500 знакам описания; на более длинном описании навыка, доступного модели, `prepare` останавливается |
+| `when_to_use` у навыка | дописывается к `description`; то же условие лежит в поле `whenToUse`, которое Harness модели не показывает |
+| `paths` у навыка | слова «При работе с файлами МАСКА.» дописываются к `description` после условия из `when_to_use`; сам фильтр в Harness не действует, команды получают строку «перед правкой таких файлов загрузи эти skills» |
 | `$ARGUMENTS` | слова «аргументы вызова из сообщения пользователя» |
 | `.claude/agents/NAME.md` | инструмент `research_NAME` с подчёркиваниями вместо дефисов; имя роли в обратных кавычках заменяется именем инструмента во всех текстах |
 | `tools` у роли | строка с набором инструментов и MCP роли; при `Agent` роль получает правила вызова и список остальных ролей, иначе запрет вызывать роли |
@@ -90,7 +92,7 @@ MCP-серверы в корне проекта; вызов MCP может за�
 не проходит тест `test_template_frontmatter_has_adapter_rules`; правило добавляется в
 `SKILL_HANDLED` или `AGENT_HANDLED`. Второй — новый встроенный инструмент Claude Code,
 которого нет в словаре `CLAUDE_TOOLS`. Третий — смена версии Harness: `DSH_VERSION` и
-`UPSTREAM_REVISION` в `scripts/harness.py`, затем проверка схемами из раздела «Проверка».
+`UPSTREAM_REVISION` в `scripts/host/harness.py`, затем проверка схемами из раздела «Проверка».
 
 Для транскрипции PDF и проверки карточек нужна модель с поддержкой изображений.
 При текстовой модели остальные процессы доступны, но нельзя считать PDF прочитанным
@@ -99,7 +101,7 @@ MCP-серверы в корне проекта; вызов MCP может за�
 ## Источники и обновление
 
 Существующие `.claude/agents`, `.claude/commands`, `.claude/skills` остаются единым
-источником инструкций. `scripts/harness.py` преобразует их в `.dsh/skills/` и
+источником инструкций. `scripts/host/harness.py` преобразует их в `.dsh/skills/` и
 `output/harness/cordis.patch.yml`. Справочные материалы копируются с сохранением
 относительных путей. Неподдерживаемая YAML-шапка вызывает ошибку, а не потерю инструкций.
 При удалении исходной команды её неизменённые производные файлы убираются по манифесту;
@@ -119,7 +121,7 @@ python tools/create.py --update ../Spectra
 перезапустите процесс. Производные файлы не редактируйте вручную и не коммитьте.
 
 Дополнительные настройки Harness передавайте отдельным локальным patch после
-сгенерированного: `python scripts/harness.py run web -- --patch /path/to/local.yml`.
+сгенерированного: `python scripts/host/harness.py run web -- --patch /path/to/local.yml`.
 Адаптер не переносит разрешения Claude и не меняет глобальные настройки Harness.
 Права задаются в Harness; ограничения мест записи в ролях являются инструкциями.
 Поле `env` stdio-сервера копируется в patch, который лежит в `output/` вне Git; ключи в
@@ -129,10 +131,10 @@ python tools/create.py --update ../Spectra
 ## Проверка
 
 ```sh
-python scripts/harness.py check
-python scripts/harness.py list
+python scripts/host/harness.py check
+python scripts/host/harness.py list
 python -m unittest discover tests
-python scripts/proj.py check --fast
+python scripts/state/proj.py check --fast
 ```
 
 Тот же набор команд выполняет CI проекта (`.github/workflows/ci.yml`); проверка
@@ -143,7 +145,7 @@ python scripts/proj.py check --fast
 Структуру итоговой конфигурации можно проверить самим Harness без запроса к модели:
 
 ```sh
-python scripts/harness.py run web -- --dump-config
+python scripts/host/harness.py run web -- --dump-config
 ```
 
 Проверка настоящими схемами и загрузчиком skills Harness (установка только в `output/`):

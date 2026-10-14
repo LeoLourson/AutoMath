@@ -15,8 +15,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 PROJECT = Path(__file__).resolve().parents[2] / 'template'
-sys.path.insert(0, str(PROJECT / 'scripts'))
-import harness
+sys.path.insert(0, str(PROJECT / 'scripts' / 'host'))
+import harness  # noqa: E402
 
 
 class HarnessAdapter(unittest.TestCase):
@@ -55,11 +55,15 @@ class HarnessAdapter(unittest.TestCase):
         for name, (fields, body) in skills.items():
             _, source, original = sources[name]
             self.assertEqual(fields['name'], name)
-            self.assertEqual(fields['description'], source['description'])
+            self.assertTrue(fields['description'].startswith(source['description']))
+            if fields.get('disable-model-invocation') is not True:
+                self.assertLessEqual(len(fields['description']), harness.CATALOG_LIMIT)
             self.assertEqual(fields.get('disable-model-invocation'), source.get('disable-model-invocation'))
             self.assertLessEqual(set(fields), harness.SKILL_FIELDS)
-            if source.get('paths'):
-                self.assertIn(source['paths'], fields['whenToUse'])
+            for key in ('when_to_use', 'paths'):
+                if source.get(key):
+                    self.assertIn(source[key], fields['description'])
+                    self.assertIn(source[key], fields['whenToUse'])
             self.assertNotIn('$ARGUMENTS', body)
             self.assertNotIn('.claude/commands/', body)
             for tool in harness.mentioned(harness.CLAUDE_TOOLS, original):
@@ -112,6 +116,8 @@ class HarnessAdapter(unittest.TestCase):
         self.write('.claude/skills/figure-style/SKILL.md', '---\nname: figure-style\ndescription: Подписи рисунков\n'
                    'paths: "figures/**/*.tex"\ndisable-model-invocation: true\n---\nМодель `haiku` не годится.\n')
         self.write('.claude/skills/figure-style/reference/sizes.md', 'ширина')
+        self.write('.claude/skills/plot-labels/SKILL.md', '---\nname: plot-labels\ndescription: Подписи осей\n'
+                   'paths: "plots/*.tex"\nwhen_to_use: После построения графика.\n---\nПодпиши оси.\n')
         config = self.root / '.mcp.json'
         data = json.loads(config.read_text(encoding='utf-8'))
         data['mcpServers']['plots'] = {'command': 'uv', 'args': ['run', 'plots.py']}
@@ -128,7 +134,12 @@ class HarnessAdapter(unittest.TestCase):
         self.assertIs(fields['disable-model-invocation'], True)
         self.assertEqual(fields['whenToUse'], 'При работе с файлами figures/**/*.tex.')
         self.assertIn('Названия моделей Claude Code (`haiku`)', body)
-        self.assertEqual((self.root / '.dsh/skills/figure-style/reference/sizes.md').read_text(), 'ширина')
+        labels, _ = harness.frontmatter(self.root / '.dsh/skills/plot-labels/SKILL.md')
+        self.assertEqual(labels['whenToUse'], 'После построения графика. При работе с файлами plots/*.tex.')
+        self.assertEqual(labels['description'],
+                         'Подписи осей После построения графика. При работе с файлами plots/*.tex.')
+        self.assertEqual((self.root / '.dsh/skills/figure-style/reference/sizes.md').read_text(encoding='utf-8'),
+                         'ширина')
         role = self.roles()['digest-writer']
         self.assertEqual(role['toolName'], 'research_digest_writer')
         self.assertIn('Роли вызываются инструментами research_*', role['persona'])
@@ -141,6 +152,15 @@ class HarnessAdapter(unittest.TestCase):
         self.assertTrue(inventory['skills']['survey']['workflow'])
         self.assertEqual(inventory['roles']['digest-writer']['tool'], 'research_digest_writer')
         self.assertIn('research_digest_writer', harness.inventory_text(self.root))
+
+    def test_description_longer_than_the_catalog_shows_is_refused(self):
+        header = '---\nname: plot-labels\ndescription: ' + 'Подписи осей. ' * 40 + '\n'
+        self.write('.claude/skills/plot-labels/SKILL.md', header + '---\nПодпиши оси.\n')
+        with self.assertRaisesRegex(ValueError, 'каталог Harness'):
+            harness.prepare(self.root)
+        self.write('.claude/skills/plot-labels/SKILL.md',
+                   header + 'disable-model-invocation: true\n---\nПодпиши оси.\n')
+        harness.prepare(self.root)
 
     def test_frontmatter_without_a_rule_is_reported(self):
         clean = harness.unported(self.root)

@@ -19,6 +19,7 @@ from pathlib import Path
 TEMPLATE = Path(__file__).resolve().parents[2] / 'template'
 REPO = TEMPLATE.parent
 sys.path.insert(0, str(TEMPLATE / 'scripts'))
+sys.path.insert(0, str(TEMPLATE / 'scripts' / 'host'))
 import harness  # noqa: E402
 
 # Инструкции набора: адресованы тому, кто создаёт проект, поэтому лежат вне заготовки.

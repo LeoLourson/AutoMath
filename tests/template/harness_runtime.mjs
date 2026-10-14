@@ -1,21 +1,26 @@
 // Contract check against the real, pinned Harness packages. No LLM calls.
-// node tests/template/harness_runtime.mjs /path/to/node_modules [--mcp]
+// node tests/template/harness_runtime.mjs /path/to/node_modules [--mcp] [--project /path/to/project]
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-// tests/template/ -> repository root, where template/scripts/harness.py writes output/.
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+// tests/template/ -> repository root: the script lives in the kit and checks the template
+// beside it, where template/scripts/host/harness.py writes output/. Another project is named
+// by --project, taken from the current directory when relative.
+const repository = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (!process.argv[2]) throw new Error('Pass the node_modules directory containing @deepseek-ai/dsh');
+const option = process.argv.indexOf('--project');
+if (option >= 0 && !process.argv[option + 1]) throw new Error('Pass the project directory after --project');
+const project = resolve(option >= 0 ? process.argv[option + 1] : resolve(repository, 'template'));
 const modules = resolve(process.argv[2]);
 const requireDsh = createRequire(resolve(modules, '@deepseek-ai/dsh/package.json'));
 const load = name => import(pathToFileURL(requireDsh.resolve(name)).href);
-const manifest = JSON.parse(await readFile(resolve(root, 'output/harness/generated.json'), 'utf8'));
+const manifest = JSON.parse(await readFile(resolve(project, 'output/harness/generated.json'), 'utf8'));
 const installed = JSON.parse(await readFile(resolve(modules, '@deepseek-ai/dsh/package.json'), 'utf8'));
 assert.equal(installed.version, manifest.dsh_version, 'Validate with the pinned Harness version');
-const [{ insert: entries }] = JSON.parse(await readFile(resolve(root, 'output/harness/cordis.patch.yml'), 'utf8'));
+const [{ insert: entries }] = JSON.parse(await readFile(resolve(project, 'output/harness/cordis.patch.yml'), 'utf8'));
 for (const entry of entries) {
   const plugin = await load(entry.name);
   const validated = await plugin.Config['~standard'].validate(entry.config);
@@ -32,13 +37,13 @@ const provider = new FileSystemSkillProvider(context, {
   signal: controller.signal, invalidate() {},
 }, { ...config, watch: false });
 try {
-  const skills = await provider.list({ cwd: root, signal: controller.signal });
+  const skills = await provider.list({ cwd: project, signal: controller.signal });
   assert(Array.isArray(skills), 'Discovery must complete without warnings');
   const expected = Object.keys(manifest.inventory.skills).length;
   assert.equal(skills.length, expected);
   assert.equal(warnings.length, 0, warnings.join('\n'));
   for (const skill of skills) {
-    const loaded = await provider.get(skill, { cwd: root, signal: controller.signal });
+    const loaded = await provider.get(skill, { cwd: project, signal: controller.signal });
     assert(loaded.content.length > 0);
     assert.equal(loaded.invocation.userInvocable, true);
     assert.equal(loaded.invocation.modelInvocable, manifest.inventory.skills[loaded.name].model_invocable);

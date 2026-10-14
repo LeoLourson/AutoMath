@@ -20,7 +20,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, mcp__lit, mcp__proj
 3. `ideas/README.md`: все идеи по этой цели. Отвергнутые открой целиком: раздел «Критика»
    говорит, почему подход не работает.
 4. `blueprint.md`: что уже доказано рядом с целью. Нужные записи открой.
-5. Источники: два-три запроса `search` (сервер `lit` или `python scripts/lit.py search`)
+5. Источники: два-три запроса `search` (сервер `lit` или `python scripts/sources/lit.py search`)
    по методам, которые собираешься применить.
 
 ## Как искать
@@ -40,7 +40,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, mcp__lit, mcp__proj
 
 ## Что записать
 
-Создай файл командой `python scripts/proj.py new idea "Название" --target R07` (или
+Создай файл командой `python scripts/state/proj.py new idea "Название" --target R07` (или
 инструментом `new` сервера `proj`) и заполни его разделы.
 
 - **Формулировка.** Гипотезы, вывод, область определения — так, чтобы утверждение можно

@@ -28,12 +28,12 @@ description: Формализация записи в Lean и проверка �
 
 ## 3. Приёмка
 
-1. `lake build`; `python scripts/proj.py set R07 lean "Полное.Имя, Другое.Имя"`;
-   `python scripts/proj.py audit R07`.
+1. `lake build`; `python scripts/state/proj.py set R07 lean "Полное.Имя, Другое.Имя"`;
+   `python scripts/state/proj.py audit R07`.
 2. Запусти агента `fidelity-checker` и передай ему номер записи. Отчёт формализатора ему
    не передавай.
 3. Проверь, что раздел «Соответствие формализации» записан в файл. Затем
-   `python scripts/proj.py set R07 fidelity "ГГГГ-ММ-ДД вердикт ОТПЕЧАТОК"`; отпечаток из
+   `python scripts/state/proj.py set R07 fidelity "ГГГГ-ММ-ДД вердикт ОТПЕЧАТОК"`; отпечаток из
    отчёта стоит последним словом.
    - `соответствует с оговорками`: впиши оговорки в раздел «Границы» записи.
    - `не соответствует`: очисти поле `lean` (значение — пустая строка), теорему оставь в
@@ -42,6 +42,6 @@ description: Формализация записи в Lean и проверка �
 
 ## 4. Итог
 
-`python scripts/proj.py sync`, затем `python scripts/proj.py check`. Отчёт: объявления;
+`python scripts/state/proj.py sync`, затем `python scripts/state/proj.py check`. Отчёт: объявления;
 вердикт соответствия; новые определения, которые ждут решения пользователя; что не
 доказано и где лежит заготовка.

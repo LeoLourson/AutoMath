@@ -1,8 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python scripts/proj.py *)",
-      "Bash(python scripts/lit.py *)",
+      "Bash(python scripts/state/proj.py *)",
+      "Bash(python scripts/sources/lit.py *)",
       "Bash(python -m unittest *)",
       "Bash(lake build)",
       "Bash(lake build *)",

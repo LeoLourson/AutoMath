@@ -5,17 +5,23 @@
 Обе группы работают на временном каталоге, поэтому состояние модулей задаёт
 единственная точка настройки — `_as_template()`.
 """
+import json
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 TEMPLATE = Path(__file__).resolve().parents[2] / 'template'
 sys.path.insert(0, str(TEMPLATE / 'scripts'))
-import leandecl  # noqa: E402
-import lit  # noqa: E402
-import proj  # noqa: E402
 import records  # noqa: E402
+from check import declarations as leandecl  # noqa: E402
+from check import hygiene  # noqa: E402
+from check import results as checks  # noqa: E402
+from sources import catalog as source_catalog  # noqa: E402
+from sources import lit  # noqa: E402
+from sources import registry as source_registry  # noqa: E402
+from state import proj  # noqa: E402
 
 
 def _as_template() -> Path:
@@ -141,7 +147,7 @@ class ProjectRecords(unittest.TestCase):
         proj.set_field('R01', 'depends', 'R02')
         proj.set_field('R02', 'lean', 'Demo.const_even, Demo.absent')
         proj.set_field('R02', 'sources', 'S3')
-        errors, _ = proj.check_records(proj.docs('results', 'R'), {'S1'}, set(), self.index)
+        errors, _ = checks.check_records(self.root, proj.docs('results', 'R'), {'S1'}, set(), self.index)
         text = '\n'.join(errors)
         for expected in ('несуществующей записи R07', 'цикл зависимостей', 'Demo.absent нет в библиотеке',
                          'источника S3 нет'):
@@ -150,14 +156,14 @@ class ProjectRecords(unittest.TestCase):
     def test_fidelity_goes_stale(self):
         proj.new('result', 'Чётность постоянной')
         proj.set_field('R01', 'lean', 'Demo.const_even')
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), self.index)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
         self.assertIn('соответствие формализации не проверено', '\n'.join(warnings))
-        mark = proj.record_fingerprint(self.index, ['Demo.const_even'])
+        mark = leandecl.record_fingerprint(self.index, ['Demo.const_even'])
         proj.set_field('R01', 'fidelity', f'2026-01-01 соответствует {mark}')
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), self.index)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
         self.assertEqual(warnings, [])
         changed = {d.name: d for d in leandecl.parse(LEAN.replace('f (-x) = f x', 'f (-x) = -f x'))}
-        _, warnings = proj.check_records(proj.docs('results', 'R'), set(), set(), changed)
+        _, warnings = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), changed)
         self.assertIn('изменились после проверки соответствия', '\n'.join(warnings))
 
     def test_views_are_built_from_headers(self):
@@ -171,16 +177,115 @@ class ProjectRecords(unittest.TestCase):
         self.assertIn('| [I01](I01.md) | Попробовать индукцию | R02 | новая |', views['ideas/README.md'])
 
     def test_hygiene_ignores_comments(self):
-        errors, _ = proj.hygiene()
+        errors, _ = hygiene.check_hygiene(self.root, 'Demo')
         self.assertEqual(errors, [])
         path = self.root / 'Demo' / 'Basic.lean'
         path.write_text(LEAN.replace('fun _ => rfl', 'by sorry'), encoding='utf-8')
-        errors, _ = proj.hygiene()
+        errors, _ = hygiene.check_hygiene(self.root, 'Demo')
         self.assertEqual(len(errors), 1)
         self.assertIn('sorry', errors[0])
 
 
 class Sources(unittest.TestCase):
+    def catalog_project(self, root: Path) -> None:
+        """Два источника: у S1 карточка файлом, у S2 — только заголовок в results.md."""
+        (root / 'project.toml').write_text('[project]\nlib = "Demo"\n', encoding='utf-8')
+        (root / 'sources' / 'cards').mkdir(parents=True)
+        rows = [dict(code='S1', title='Первая', authors='А. А.', version='v1', url='https://example.org/1',
+                     role='метод', filename='one.pdf', sha256='abc', pages=3),
+                dict(code='S2', title='Вторая', authors='Б. Б.', version='v2', url='https://example.org/2',
+                     role='оценка')]
+        (root / 'sources' / 'papers.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n',
+                                                      encoding='utf-8')
+        (root / 'sources' / 'cards' / 'S1.md').write_text(
+            '---\nsource: S1\nverified: 2026-01-01\n---\n\n# Теорема\n', encoding='utf-8')
+        (root / 'sources' / 'results.md').write_text(
+            '# Результаты\n\n## S2. Вторая\n\nПроверено по PDF.\n', encoding='utf-8')
+
+    def test_cards_are_counted_by_one_rule(self):
+        """Обе раскладки карточек видны и каталогу, и проверке; `verified` — только из шапки."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.catalog_project(root)
+            try:
+                proj.configure(root)  # корень слоя источников настраивает само состояние
+                facts = source_registry.facts()
+                self.assertEqual((facts.codes, facts.carded, facts.verified),
+                                 ({'S1', 'S2'}, {'S1', 'S2'}, {'S1'}))
+                self.assertEqual(lit.cards(), {'S1', 'S2'})
+                self.assertEqual(proj.registry(), ({'S1', 'S2'}, {'S1', 'S2'}, {'S1'}))
+                text = source_catalog.text()
+                self.assertIn('карточка есть.', text.split('## S1.')[1].split('## S2.')[0])
+                self.assertIn('карточка есть.', text.split('## S2.')[1])
+            finally:
+                _as_template()
+
+    def test_catalog_text_is_pure_and_the_page_matches_it(self):
+        """Чистая сборка не пишет, а запись кладёт ровно её текст и статусы в реестр."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.catalog_project(root)
+            try:
+                proj.configure(root)
+                before = (root / 'sources' / 'papers.json').read_bytes()
+                text = source_catalog.text()
+                self.assertNotIn('Обновлено', text)  # дата делала бы текст другим каждые сутки
+                self.assertEqual((root / 'sources' / 'papers.json').read_bytes(), before)
+                self.assertFalse((root / 'sources' / 'catalog.md').exists())
+                source_catalog.catalog()
+                self.assertEqual((root / 'sources' / 'catalog.md').read_text(encoding='utf-8'),
+                                 source_catalog.text())
+                rows = {row['code']: row['status'] for row in
+                        json.loads((root / 'sources' / 'papers.json').read_text(encoding='utf-8'))}
+                self.assertTrue(rows['S1'].startswith('PDF; карточка есть.'))
+                self.assertEqual(rows['S2'], 'Полного текста нет; карточка есть.')
+            finally:
+                _as_template()
+
+    def test_check_notices_a_stale_catalog(self):
+        """`proj.py check` называет устаревший каталог, а `sync` снимает замечание."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.catalog_project(root)
+            (root / 'Demo.lean').write_text('', encoding='utf-8')
+            try:
+                proj.configure(root)
+                _, report = proj.check(fast=True)
+                self.assertIn('sources/catalog.md устарел: python scripts/state/proj.py sync',
+                              '\n'.join(report))
+                proj.sync()
+                _, report = proj.check(fast=True)
+                self.assertNotIn('sources/catalog.md', '\n'.join(report))
+                (root / 'sources' / 'catalog.md').unlink()
+                _, report = proj.check(fast=True)
+                self.assertIn('sources/catalog.md устарел: python scripts/state/proj.py sync',
+                              '\n'.join(report))
+            finally:
+                _as_template()
+
+    def test_mutating_command_rebuilds_the_catalog(self):
+        """Пересборка каталога — политика фасада `lit`, а не самого реестра: она нужна всем входам."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.catalog_project(root)
+            source = root / 'one.tex'
+            source.write_text('\\documentclass{article}\n', encoding='utf-8')
+            try:
+                proj.configure(root)
+                with patch.object(source_registry.search, 'index', return_value=[]):
+                    lit.attach('S1', str(source))
+                page = (root / 'sources' / 'catalog.md').read_text(encoding='utf-8')
+                self.assertEqual(page, source_catalog.text())
+                self.assertIn('LaTeX', page)
+                (root / 'sources' / 'catalog.md').unlink()
+                # Реестр уже записан, а индексация сорвалась: страница всё равно должна появиться.
+                with patch.object(source_registry.search, 'index', side_effect=RuntimeError('нет модели')):
+                    with self.assertRaises(RuntimeError):
+                        lit.attach('S1', str(source))
+                self.assertTrue((root / 'sources' / 'catalog.md').exists())
+            finally:
+                _as_template()
+
     def test_configure_points_paths_at_the_project(self):
         """Пути источников выводятся из корня, а не из места установки скрипта."""
         with tempfile.TemporaryDirectory() as folder:

@@ -8,7 +8,7 @@
 записи, идеи, источники, библиотека Lean и статья не трогаются.
 
 Команды ниже в подсказках выполняются уже в папке созданного проекта, где этот файл
-лежит как scripts/proj.py.
+лежит как scripts/state/proj.py.
 """
 from __future__ import annotations
 
@@ -42,8 +42,19 @@ def render(data: bytes, lib: str, title: str) -> bytes:
     return text.replace('__LIB__', lib).replace('__TITLE__', title).encode('utf-8')
 
 
+def output_tail(result: subprocess.CompletedProcess, lines: int = 20) -> str:
+    """Хвост stdout и stderr команды — чтобы падение было видно в сообщении."""
+    parts = []
+    for name, stream in (('stdout', result.stdout), ('stderr', result.stderr)):
+        text = stream.decode('utf-8', errors='replace') if isinstance(stream, bytes) else (stream or '')
+        text = text.strip()
+        if text:
+            parts.append(f'--- {name} ---\n' + '\n'.join(text.splitlines()[-lines:]))
+    return '\n'.join(parts)
+
+
 def prepare_harness(target: Path) -> None:
-    subprocess.run([sys.executable, str(target / 'scripts/harness.py'), 'prepare'],
+    subprocess.run([sys.executable, str(target / 'scripts/host/harness.py'), 'prepare'],
                    cwd=target, check=True)
 
 
@@ -71,14 +82,23 @@ def create(target: Path, lib: str, title: str, pins: Path | None, git: bool) -> 
     if git and shutil.which('git'):
         subprocess.run(['git', 'init', '--quiet'], cwd=target, check=False)
     # Сводки собираются сразу, чтобы первая проверка проекта прошла
-    subprocess.run([sys.executable, 'scripts/proj.py', 'sync'], cwd=target, check=False, capture_output=True)
+    summary = subprocess.run([sys.executable, 'scripts/state/proj.py', 'sync'],
+                             cwd=target, check=False, capture_output=True)
+    if summary.returncode:
+        raise SystemExit(
+            f'Проект создан: {target}\n'
+            'Но сводки не собраны: python scripts/state/proj.py sync завершилась с кодом '
+            f'{summary.returncode}.\n'
+            'Скопированные файлы оставлены на месте. Исправьте причину и повторите из папки проекта:\n'
+            '  python scripts/state/proj.py sync\n'
+            'Вывод команды:\n' + output_tail(summary))
     prepare_harness(target)
     print(f'Проект создан: {target}\n\nДальше, из папки проекта:\n'
           '  lake exe cache get                  # готовая сборка Mathlib\n'
           '  lake build\n'
-          '  python scripts/proj.py doctor       # окружение\n'
-          '  python scripts/proj.py check        # одно замечание о примере R01\n'
-          '  python scripts/harness.py run web   # DeepSeek Harness\n'
+          '  python scripts/state/proj.py doctor       # окружение\n'
+          '  python scripts/state/proj.py check        # одно замечание о примере R01\n'
+          '  python scripts/host/harness.py run web   # DeepSeek Harness\n'
           'Затем заполните question.md и PROJECT.md; остальное — в README.md проекта.')
 
 
@@ -107,8 +127,18 @@ def update(target: Path, dry: bool) -> None:
     if extra:
         print('Есть в проекте, но не в шаблоне (свои или устаревшие; не удаляются):')
         print('\n'.join('  ' + name for name in extra))
+    # Команда и навык делят одно пространство имён: навык проекта с именем команды шаблона
+    # не даст собрать интеграцию.
+    commands = {Path(name).stem for name in known if name.startswith('.claude/commands/')}
+    clash = sorted(commands & {path.parent.name for path in (target / '.claude/skills').glob('*/SKILL.md')})
+    if clash:
+        message = ('Навык проекта носит имя команды шаблона: ' + ', '.join(clash) +
+                   '. Удалите папку .claude/skills/ИМЯ/ и повторите обновление.')
+        if not dry:
+            raise SystemExit(message)
+        print(message)
     if changed and not dry:
-        print('Проверьте: python -m unittest discover tests; python scripts/proj.py check --fast')
+        print('Проверьте: python -m unittest discover tests; python scripts/state/proj.py check --fast')
     if not dry:
         prepare_harness(target)
     else:

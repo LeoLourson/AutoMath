@@ -15,7 +15,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, mcp__proj
 
 1. Прочитай идею или вопрос, контрольные случаи в `question.md`, правила в
    `experiments/README.md`.
-2. Создай опыт: `python scripts/proj.py new experiment "Название" --idea I07`. До расчёта
+2. Создай опыт: `python scripts/state/proj.py new experiment "Название" --idea I07`. До расчёта
    запиши в его `README.md` вопрос и исход, опровергающий гипотезу.
 3. Напиши `run.py`: зависимости — в заголовке PEP 723, параметры и зерно случайных чисел
    — в коде, результат — таблица в stdout. Запуск: `uv run experiments/E01/run.py`.

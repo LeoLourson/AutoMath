@@ -15,7 +15,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, Agent, mcp__lean-lsp, mcp__proj
 ## До первой строки
 
 1. Прочитай запись: «Утверждение», «Доказательство», «Границы». Для записей из `depends`
-   посмотри их объявления Lean: `python scripts/proj.py statement R03` или инструмент
+   посмотри их объявления Lean: `python scripts/state/proj.py statement R03` или инструмент
    `statement` сервера `proj`.
 2. Соглашения об оформлении возьми из `PROJECT.md` и соседних модулей: заголовок,
    импорты, пространство имён, стиль имён, язык докстрингов.
@@ -62,7 +62,7 @@ tools: Read, Grep, Glob, Bash, Write, Edit, Agent, mcp__lean-lsp, mcp__proj
 ## Шаг 4. Сдача
 
 1. `lake build` проходит без ошибок и без предупреждений в твоих файлах.
-2. `python scripts/proj.py audit Полное.Имя …` показывает только разрешённые аксиомы.
+2. `python scripts/state/proj.py audit Полное.Имя …` показывает только разрешённые аксиомы.
 3. Свои временные заготовки из `Scratch.lean` убраны.
 
 Шапку записи не меняй: поле `lean` заполнит вызывающая сторона по твоему отчёту.
