@@ -7,8 +7,6 @@
 Запускается из корня проекта: `uv run --directory . --script scripts/state/mcp.py`.
 Каталог скриптов ставится в sys.path здесь же, корень проекта — из `--directory`.
 """
-import contextlib
-import functools
 import sys
 from pathlib import Path
 
@@ -20,6 +18,7 @@ sys.path[:] = [str(HERE.parents[1])] + [
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
+from mcptool import guard  # noqa: E402
 from state import proj  # noqa: E402
 
 server = FastMCP('proj', instructions=(
@@ -27,18 +26,7 @@ server = FastMCP('proj', instructions=(
     'Статус утверждения хранится в шапке его записи; blueprint.md и ideas/README.md собирает sync. '
     'Текст записи читается и правится обычными инструментами для файлов.'))
 
-
-def tool(function):
-    """Регистрирует инструмент; ошибку возвращает текстом, а не роняет сервер."""
-    @functools.wraps(function)
-    def guarded(*args, **kwargs):
-        try:
-            # stdout занят протоколом MCP: случайная печать библиотеки уходит в stderr
-            with contextlib.redirect_stdout(sys.stderr):
-                return function(*args, **kwargs)
-        except (SystemExit, ValueError, OSError, KeyError) as error:
-            return f'ОШИБКА: {error}'
-    return server.tool()(guarded)
+tool = guard(server)
 
 
 @tool

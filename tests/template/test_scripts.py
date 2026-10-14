@@ -251,9 +251,10 @@ def called_modules(path: Path) -> list[tuple[int, str, str]]:
     return sorted(found)
 
 
-# Слои скриптов: `records` и `host` — основа, `sources` и `check` — середина, `state` — верх.
-# Модуль импортирует только тех, кто ниже; внутри своего пакета — кого угодно.
-LEVELS = {'records': 0, 'host': 0, 'sources': 1, 'check': 1, 'state': 2}
+# Слои скриптов: общие основания (формат записи, запуск инструментов MCP) и `host` — низ,
+# `sources` и `check` — середина, `state` — верх. Модуль импортирует только тех, кто ниже;
+# внутри своего пакета — кого угодно.
+LEVELS = {'records': 0, 'mcptool': 0, 'host': 0, 'sources': 1, 'check': 1, 'state': 2}
 # Ряд внутри слоя источников: модуль импортирует только стоящих левее. Производные
 # (catalog, search, tex) упорядочены так, чтобы исключений было меньше.
 SOURCES_ORDER = ('web', 'paths', 'papers', 'store', 'registry', 'catalog', 'search', 'tex', 'lit', 'mcp')
