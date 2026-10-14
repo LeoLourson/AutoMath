@@ -9,10 +9,13 @@ from __future__ import annotations
 
 import bisect
 import re
+import shutil
 import subprocess
+from datetime import date
 from pathlib import Path
 
 from sources import papers, paths, registry, search, store, web
+
 PREAMBLE = r'''% Транскрипция PDF, сделанная моделью. При расхождении первичен PDF.
 % Собрано командой `python scripts/sources/lit.py tex` из частей output/literature/parts/.
 \documentclass[11pt]{article}
@@ -60,10 +63,12 @@ def lint_tex(text: str, pages: int | None) -> list[str]:
 def compile_tex(path: Path) -> list[str]:
     if not shutil.which('pdflatex'):
         return ['pdflatex не найден: сборка не проверена']
-    build = LIT / 'build'
+    build = paths.LIT / 'build'
     build.mkdir(parents=True, exist_ok=True)
-    run = subprocess.run(['pdflatex', '-interaction=nonstopmode', '-halt-on-error', '-file-line-error',
-                          f'-output-directory={build}', str(path)], capture_output=True, cwd=LIT, stdin=subprocess.DEVNULL)
+    run = subprocess.run(
+        ['pdflatex', '-interaction=nonstopmode', '-halt-on-error', '-file-line-error',
+         f'-output-directory={build}', str(path)],
+        capture_output=True, cwd=paths.LIT, stdin=subprocess.DEVNULL)
     log = run.stdout.decode('utf-8', 'replace')
     errors = [line for line in log.split('\n') if re.match(r'.*:\d+: |^! ', line)][:6]
     return [f'pdflatex: {line.strip()}' for line in errors] if run.returncode else []
@@ -74,7 +79,7 @@ def tex(code: str, origin: str = 'transcription', build: bool = False) -> list[s
     rows = registry.load()
     row = registry.by_code(rows, code)
     stem = registry.stem_of(row)
-    target, parts = LIT / (stem + '.tex'), sorted((LIT / 'parts' / stem).glob('*.tex'))
+    target, parts = paths.LIT / (stem + '.tex'), sorted((paths.LIT / 'parts' / stem).glob('*.tex'))
     if parts:
         head = PREAMBLE + f"\\title{{{tex_escape(row['title'])}}}\n\\author{{{tex_escape(row['authors'])}}}\n" \
             f"\\date{{{tex_escape(row['version'])}}}\n" '\\begin{document}\n\\maketitle\n\n'
@@ -88,7 +93,6 @@ def tex(code: str, origin: str = 'transcription', build: bool = False) -> list[s
         notes += compile_tex(target)
     row.update(tex=target.name, tex_origin=origin, tex_date=f'{date.today():%Y-%m-%d}')
     registry.save(rows)
-    catalog()
     return ([f"{row['code']}: output/literature/{target.name}, частей: {len(parts)}"]
             + [f'ЗАМЕЧАНИЕ: {note}' for note in notes] + search.index([row['code']]))
 ENVIRONMENTS = {

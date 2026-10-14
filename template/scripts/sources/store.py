@@ -12,6 +12,8 @@ import urllib.error
 from pathlib import Path
 
 from sources import papers, paths, registry, web
+
+
 def pdf_text(pdf: Path) -> tuple[int, bool]:
     """Число страниц и признак текстового слоя; слой пишется в соседний .txt (страницы через \\f)."""
     import pymupdf as fitz
@@ -28,9 +30,9 @@ def store_pdf(row: dict, data: bytes, name: str) -> None:
         raise ValueError(f"{row['code']}: по ссылке {row.get('pdf_url', '')} пришёл не PDF (доступ закрыт?)")
     if row.get('sha256') and row['sha256'] != registry.sha256(data):
         raise ValueError(f"{row['code']}: PDF отличается от записанного в реестре; сверь версию")
-    LIT.mkdir(parents=True, exist_ok=True)
-    (LIT / name).write_bytes(data)
-    pages, layer = pdf_text(LIT / name)
+    paths.LIT.mkdir(parents=True, exist_ok=True)
+    (paths.LIT / name).write_bytes(data)
+    pages, layer = pdf_text(paths.LIT / name)
     row.update(filename=name, pages=pages, sha256=registry.sha256(data), text_layer=layer)
 
 
@@ -46,8 +48,8 @@ def store_eprint(row: dict) -> str:
         row['eprint'] = 'pdf'
         return 'pdf'
     name = registry.stem_of(row) + '.tex'
-    LIT.mkdir(parents=True, exist_ok=True)
-    (LIT / name).write_text(papers.flatten(files), encoding='utf-8', newline='\n')
+    paths.LIT.mkdir(parents=True, exist_ok=True)
+    (paths.LIT / name).write_text(papers.flatten(files), encoding='utf-8', newline='\n')
     row.update(tex=name, tex_origin='arxiv', eprint_sha256=registry.sha256(data))
     return 'tex'
 
@@ -62,16 +64,16 @@ def fetch(codes: list[str] | None = None) -> list[str]:
             continue
         done = []
         try:
-            if row.get('filename') and not (LIT / row['filename']).exists():
-                store.store_pdf(row, web.http_get(row['pdf_url']), row['filename'])
+            if row.get('filename') and not (paths.LIT / row['filename']).exists():
+                store_pdf(row, web.http_get(row['pdf_url']), row['filename'])
                 done.append('PDF')
             if row.get('filename') and row.get('text_layer', True) \
-                    and not (LIT / row['filename']).with_suffix('.txt').exists():
-                row['pages'], row['text_layer'] = store.pdf_text(LIT / row['filename'])
+                    and not (paths.LIT / row['filename']).with_suffix('.txt').exists():
+                row['pages'], row['text_layer'] = pdf_text(paths.LIT / row['filename'])
                 done.append('текст PDF')
-            if registry.arxiv_id(row) and row.get('eprint') != 'pdf' and not (row.get('tex') and (LIT / row['tex']).exists()):
-                done.append('LaTeX' if store.store_eprint(row) == 'tex' else 'на arXiv только PDF')
-            if row.get('tex') and not (LIT / row['tex']).exists():
+            if registry.arxiv_id(row) and row.get('eprint') != 'pdf' and not (row.get('tex') and (paths.LIT / row['tex']).exists()):
+                done.append('LaTeX' if store_eprint(row) == 'tex' else 'на arXiv только PDF')
+            if row.get('tex') and not (paths.LIT / row['tex']).exists():
                 raise ValueError(f"нет {row['tex']}: транскрипция и локальный LaTeX по ссылке не восстанавливаются")
         except (ValueError, ConnectionError, urllib.error.URLError) as error:
             report.append(f"{row['code']}: ОШИБКА — {error}")
@@ -79,7 +81,6 @@ def fetch(codes: list[str] | None = None) -> list[str]:
         if done:
             registry.save(rows)
             report.append(f"{row['code']}: " + ', '.join(done))
-    catalog()
     return report or ['Все файлы реестра на месте.']
 
 
@@ -87,13 +88,12 @@ def pdf(code: str) -> list[str]:
     """Скачивает PDF источника: номера теорем и страницы для карточки сверяются по нему."""
     rows = registry.load()
     row = registry.by_code(rows, code)
-    if row.get('filename') and (LIT / row['filename']).exists():
+    if row.get('filename') and (paths.LIT / row['filename']).exists():
         return [f"{row['code']}: output/literature/{row['filename']} уже есть"]
     if not row.get('pdf_url'):
         raise SystemExit(f"{row['code']}: ссылки на PDF нет; прикрепите файл командой attach")
-    store.store_pdf(row, web.http_get(row['pdf_url']), row.get('filename') or registry.stem_of(row) + '.pdf')
+    store_pdf(row, web.http_get(row['pdf_url']), row.get('filename') or registry.stem_of(row) + '.pdf')
     registry.save(rows)
-    catalog()
     return [f"{row['code']}: output/literature/{row['filename']}, {row['pages']} стр."]
 
 
@@ -101,13 +101,13 @@ def pages(code: str, first: int = 1, last: int | None = None, dpi: int = 170) ->
     """Страницы PDF в PNG и их текстовый слой: материал для транскрипции и сверки карточек."""
     import pymupdf as fitz
     row = registry.by_code(registry.load(), code)
-    if not (row.get('filename') and (LIT / row['filename']).exists()):
+    if not (row.get('filename') and (paths.LIT / row['filename']).exists()):
         pdf(code)
         row = registry.by_code(registry.load(), code)
-    folder = LIT / 'pages' / Path(row['filename']).stem
+    folder = paths.LIT / 'pages' / Path(row['filename']).stem
     folder.mkdir(parents=True, exist_ok=True)
     report = []
-    with fitz.open(LIT / row['filename']) as doc:
+    with fitz.open(paths.LIT / row['filename']) as doc:
         for number in range(first, min(last or len(doc), len(doc)) + 1):
             page = doc[number - 1]
             image = folder / f'p{number:04d}.png'
@@ -117,6 +117,6 @@ def pages(code: str, first: int = 1, last: int | None = None, dpi: int = 170) ->
             note = 'текстового слоя нет'
             if len(text) >= 400:
                 image.with_suffix('.txt').write_text(text, encoding='utf-8', newline='\n')
-                note = f'слой: {image.with_suffix(".txt").relative_to(ROOT).as_posix()}'
-            report.append(f'стр. файла {number}: {image.relative_to(ROOT).as_posix()}; {note}')
+                note = f'слой: {image.with_suffix(".txt").relative_to(paths.ROOT).as_posix()}'
+            report.append(f'стр. файла {number}: {image.relative_to(paths.ROOT).as_posix()}; {note}')
     return report

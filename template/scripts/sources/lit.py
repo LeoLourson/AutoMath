@@ -5,9 +5,10 @@
 """Источники проекта: реестр, загрузка полных текстов, транскрипции, индекс и поиск.
 
 Модуль — единственный вход в работу с источниками: остальные модули папки `sources/` заняты
-каждый своим делом (`http`, `papers`, `registry`, `store`, `tex`, `search`, `catalog`) и
+каждый своим делом (`web`, `papers`, `registry`, `store`, `tex`, `search`, `catalog`) и
 команд не разбирают. Здесь настройка путей и командная строка; тот же набор действий есть у
-MCP-сервера `sources/mcp.py`.
+MCP-сервера `sources/mcp.py`. Изменяющие команды после правки реестра пересобирают
+производный каталог: политика живёт здесь и потому одна для всех входов.
 
 Реестр — `sources/papers.json`; каталог `sources/catalog.md` строится из него. Тексты и
 индекс лежат в `output/literature/`, вне Git. Команды: `python scripts/sources/lit.py -h`.
@@ -20,7 +21,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from sources import catalog, papers, paths, registry, search, store, web  # noqa: E402
+from sources import catalog, papers, paths, registry, store, web  # noqa: E402
+# Модули берутся под своими именами: имя `search` осталось бы за модулем и перекрыло бы
+# функцию `search_texts` — вызов `lit.search(...)` тогда падал бы как вызов модуля.
+from sources import search as search_source  # noqa: E402
 from sources import tex as tex_source  # noqa: E402
 
 ROOT = paths.ROOT
@@ -31,18 +35,64 @@ DIRECT_HOSTS = web.DIRECT_HOSTS
 # Настройка и по одной функции каждого рода работы — то, чем пользуются снаружи.
 classify, amsbib, flatten = registry.classify, papers.amsbib, papers.flatten
 find, cites = papers.find, papers.cites
-listing = search.listing
+listing = search_source.listing
 load, save, known, next_code = registry.load, registry.save, registry.known, registry.next_code
 stem_of, sha256 = registry.stem_of, registry.sha256
-cards, add, add_file, attach = catalog.cards, registry.add, registry.add_file, registry.attach
-fetch = store.fetch
-pdf, pages = store.pdf, store.pages
 status_of, catalog_page = catalog.status_of, catalog.catalog
-index_texts, search_texts, show = search.index, search.search, search.show
-embed, corpus, text_file = search.embed, search.corpus, search.text_file
+index_texts, search_texts, show = search_source.index, search_source.search, search_source.show
+embed, corpus, text_file = search_source.embed, search_source.corpus, search_source.text_file
 PREAMBLE, tex_escape, lint_tex, compile_tex = (tex_source.PREAMBLE, tex_source.tex_escape,
                                                tex_source.lint_tex, tex_source.compile_tex)
 tex_chunks, txt_chunks = tex_source.tex_chunks, tex_source.txt_chunks
+
+
+def cards() -> set[str]:
+    """Коды источников с карточкой: правило одно и живёт у реестра (`registry.facts`)."""
+    return registry.facts().carded
+
+
+def _rebuilt(function, *args) -> list[str]:
+    """Изменяющая команда: после правки реестра пересобирается производный каталог.
+
+    Политика «после изменения реестра пересобрать страницу» живёт в фасаде, поэтому
+    применяется ко всем изменяющим командам одинаково — и из командной строки, и из
+    MCP-сервера `sources/mcp.py`, который зовёт этот модуль. Пересборка идёт и тогда, когда
+    команда закончилась ошибкой после записи реестра: страница обязана отражать реестр.
+    """
+    try:
+        return function(*args)
+    finally:
+        catalog.catalog()
+
+
+def add(idents: list[str], role: str) -> list[str]:
+    """Добавляет источники по идентификаторам arXiv, MathNet и DOI."""
+    return _rebuilt(registry.add, idents, role)
+
+
+def add_file(source: str, title: str, authors: str, version: str, url: str, name: str, role: str) -> list[str]:
+    """Добавляет источник без arXiv, MathNet и DOI: PDF или LaTeX по ссылке либо из файла."""
+    return _rebuilt(registry.add_file, source, title, authors, version, url, name, role)
+
+
+def attach(code: str, source: str) -> list[str]:
+    """Прикрепляет к записи реестра PDF или LaTeX, полученный вручную."""
+    return _rebuilt(registry.attach, code, source)
+
+
+def fetch(codes: list[str] | None = None) -> list[str]:
+    """Восстанавливает недостающие файлы реестра: исходники arXiv и PDF."""
+    return _rebuilt(store.fetch, codes)
+
+
+def pdf(code: str) -> list[str]:
+    """Скачивает PDF источника: по нему сверяются номер теоремы и страница для карточки."""
+    return _rebuilt(store.pdf, code)
+
+
+def pages(code: str, first: int = 1, last: int | None = None, dpi: int = 170) -> list[str]:
+    """Страницы PDF в PNG и их текстовый слой: материал для транскрипции и сверки карточек."""
+    return _rebuilt(store.pages, code, first, last, dpi)
 
 
 def configure(root: Path, direct_hosts: list[str] | None = None) -> None:
@@ -57,7 +107,7 @@ def configure(root: Path, direct_hosts: list[str] | None = None) -> None:
 
 def tex(code: str, origin: str = 'transcription', build: bool = False) -> list[str]:
     """Собирает транскрипцию источника: части из `output/literature/parts/` в один LaTeX."""
-    return tex_source.tex(ROOT, code, origin, build)
+    return _rebuilt(tex_source.tex, ROOT, code, origin, build)
 
 
 def main() -> None:

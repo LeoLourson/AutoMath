@@ -7,6 +7,7 @@ zbMATH и Semantic Scholar и разбор их ответов: ни один и
 """
 from __future__ import annotations
 
+import gzip
 import html
 import io
 import json
@@ -17,6 +18,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from sources import registry, web
+
+# Тег arXiv поверх Atom; нужен запросам списка работ.
+ATOM = {'a': 'http://www.w3.org/2005/Atom', 'x': 'http://arxiv.org/schemas/atom'}
+
+
 def arxiv_query(**params) -> list[dict]:
     url = 'https://export.arxiv.org/api/query?' + urllib.parse.urlencode(params)
     papers = []
@@ -260,13 +266,13 @@ def find(query: str, where: str | None = None, limit: int = 15) -> str:
     out = []
     for engine in ([where] if where else ['zbmath', 'arxiv']):
         if engine == 'zbmath':
-            found = papers.zbmath_search(query, limit)
+            found = zbmath_search(query, limit)
         elif engine == 'arxiv':
             words = query if re.search(r'\b(all|ti|abs|au|cat):', query) else \
                 ' AND '.join('all:' + word for word in re.findall(r'"[^"]+"|\S+', query))
-            found = papers.arxiv_query(search_query=words, max_results=limit, sortBy='relevance')
+            found = arxiv_query(search_query=words, max_results=limit, sortBy='relevance')
         elif engine == 'mathnet':
-            found = papers.crossref_search(query, limit, '10.4213')
+            found = crossref_search(query, limit, '10.4213')
         else:
             raise SystemExit(f'Неизвестная база «{engine}»: zbmath, arxiv или mathnet.')
         out.append(f'== {engine} ==\n{describe(found)}')
@@ -278,12 +284,12 @@ def cites(ref: str, references: bool = False, limit: int = 60) -> str:
     row = registry.by_code(registry.load(), ref) if re.fullmatch(r'[Ss]\d+', ref) else None
     if row:
         if row.get('mathnet') and not references:
-            return describe(papers.mathnet_citing(row['mathnet'])[:limit])
+            return describe(mathnet_citing(row['mathnet'])[:limit])
         ident = 'arXiv:' + registry.bare(registry.arxiv_id(row)) if registry.arxiv_id(row) else \
             'DOI:' + (row.get('doi_en') or (registry.dois_of(row) or [''])[0])
     else:
         kind, value = registry.classify(ref)
         if kind == 'mathnet' and not references:
-            return describe(papers.mathnet_citing(value)[:limit])
+            return describe(mathnet_citing(value)[:limit])
         ident = {'arxiv': 'arXiv:' + registry.bare(value), 'mathnet': 'DOI:10.4213/' + value, 'doi': 'DOI:' + value}[kind]
-    return describe(papers.scholar(ident, references, limit))
+    return describe(scholar(ident, references, limit))

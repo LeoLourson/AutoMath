@@ -5,19 +5,22 @@
 """MCP-сервер источников: те же действия, что в scripts/sources/lit.py, с моделью поиска в памяти.
 
 Запускается из корня проекта: `uv run --directory . --script scripts/sources/mcp.py`.
-Каталог скриптов попадает в sys.path при загрузке этого файла, корень проекта — из
-`--directory`.
+Каталог скриптов ставится в sys.path здесь же, корень проекта — из `--directory`.
 """
 import contextlib
 import functools
 import sys
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+# sys.path[0] — каталог этого файла; файл mcp.py перекрыл бы пакет `mcp`, поэтому он
+# заменяется каталогом scripts/: он же нужен импортам `from sources import …` внутри lit.py.
+HERE = Path(__file__).resolve()
+sys.path[:] = [str(HERE.parents[1])] + [
+    entry for entry in sys.path if not entry or Path(entry).resolve() != HERE.parent]
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-import lit  # noqa: E402
+from sources import lit  # noqa: E402
 
 server = FastMCP('lit', instructions=(
     'Источники проекта: поиск по полным текстам работ из sources/papers.json, поиск новых работ в zbMATH, '
@@ -48,7 +51,7 @@ def search(query: str, k: int = 8, codes: list[str] | None = None, kind: str | N
     В ответе: номер куска для show, источник, тип и печатный номер утверждения, раздел, файл и строка;
     у транскрипции — печатная страница, у текста PDF — страница файла.
     """
-    return lit.search(query, k, [code.upper() for code in codes] if codes else None, kind)
+    return lit.search_texts(query, k, [code.upper() for code in codes] if codes else None, kind)
 
 
 @tool
@@ -137,5 +140,5 @@ def papers() -> str:
 
 if __name__ == '__main__':
     # Модель загружается до запуска сервера: под Windows загрузка из обработчика зависает
-    lit.search.embed(['прогрев'], 'query: ')
+    lit.embed(['прогрев'], 'query: ')
     server.run()

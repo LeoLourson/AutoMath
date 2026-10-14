@@ -3,29 +3,62 @@
 Реестр — единственное место, где источник получает код `S…`; номера не переиспользуются.
 Теорема источника становится посылкой доказательства только после карточки
 `sources/cards/S*.md` и её сверки с PDF, а не после добавления в реестр.
+
+Здесь же считается единственный набор фактов о подборке (`facts`): коды реестра, коды с
+карточкой и коды с карточкой, сверенной по PDF. Каталог и `proj.py check` выносят суждения
+по нему, а не по своим правилам.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 import re
+import urllib.error
+from dataclasses import dataclass
+from pathlib import Path
 
-from sources import papers, paths, store
+import records
 
-# Тег arXiv поверх Atom; нужен запросам списка работ.
-ATOM = {'a': 'http://www.w3.org/2005/Atom', 'x': 'http://arxiv.org/schemas/atom'}
+from sources import papers, paths, search, store, web
+
+
 def load() -> list[dict]:
-    return json.loads(REGISTRY.read_text(encoding='utf-8')) if REGISTRY.exists() else []
+    return json.loads(paths.REGISTRY.read_text(encoding='utf-8')) if paths.REGISTRY.exists() else []
 
 
 def save(rows: list[dict]) -> None:
     rows.sort(key=lambda row: int(row['code'][1:]))
-    REGISTRY.parent.mkdir(parents=True, exist_ok=True)
-    REGISTRY.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
+    paths.REGISTRY.parent.mkdir(parents=True, exist_ok=True)
+    paths.REGISTRY.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + '\n', encoding='utf-8', newline='\n')
 
 
 def next_code(rows: list[dict]) -> str:
     return 'S%d' % (max((int(row['code'][1:]) for row in rows), default=0) + 1)
+
+
+@dataclass
+class Facts:
+    """Факты подборки, по которым выносят суждения о источниках."""
+    codes: set[str]      # коды источников реестра
+    carded: set[str]     # коды, у которых есть карточка
+    verified: set[str]   # коды, у которых карточка сверена с PDF
+
+
+def facts() -> Facts:
+    """Единственное правило: есть ли у источника карточка и сверена ли она.
+
+    Карточка — файл `sources/cards/S*.md` либо заголовок в едином `sources/results.md`
+    (`paths.RESULTS`): обе раскладки поддержаны намеренно. Отметку `verified` даёт только
+    шапка файла карточки; в однoфайловой раскладке шапки нет, и её источники в `verified`
+    не попадают — это ограничение раскладки, а не пропущенная сверка.
+    """
+    codes = {row['code'] for row in load()}
+    files = [records.read_doc(path) for path in paths.CARDS.glob('S*.md')] if paths.CARDS.exists() else []
+    carded = {doc.id for doc in files if doc.id}
+    if paths.RESULTS.exists():
+        headings = ' '.join(re.findall(r'^## (.*)$', paths.RESULTS.read_text(encoding='utf-8'), re.M))
+        carded |= set(re.findall(r'S\d+', headings))
+    return Facts(codes, carded, {doc.id for doc in files if doc.id and doc.meta.get('verified')})
 
 
 def arxiv_id(row: dict) -> str | None:
@@ -102,16 +135,20 @@ def classify(ident: str) -> tuple[str, str]:
         return 'mathnet', text
     raise ValueError(f'не распознан идентификатор «{ident}»: нужен arXiv, mathnet:… или DOI')
 def add(idents: list[str], role: str) -> list[str]:
-    """Добавляет источники по идентификаторам arXiv, MathNet и DOI: метаданные, текст, каталог, индекс."""
-    rows, report, added = registry.load(), [], []
+    """Добавляет источники по идентификаторам arXiv, MathNet и DOI: метаданные, текст, индекс.
+
+    Производный каталог после правки реестра пересобирает фасад `sources/lit.py`: там же,
+    где командная строка, поэтому одинаково для неё и для MCP-сервера.
+    """
+    rows, report, added = load(), [], []
     for ident in idents:
         try:
-            kind, value = registry.classify(ident)
-            key = f'{kind}:{registry.bare(value) if kind == "arxiv" else value.lower()}'
-            if key in registry.known(rows):
-                report.append(f'{registry.known(rows)[key]}: {key} уже в реестре')
+            kind, value = classify(ident)
+            key = f'{kind}:{bare(value) if kind == "arxiv" else value.lower()}'
+            if key in known(rows):
+                report.append(f'{known(rows)[key]}: {key} уже в реестре')
                 continue
-            row = dict(code=registry.next_code(rows))
+            row = dict(code=next_code(rows))
             if kind == 'arxiv':
                 found = papers.arxiv_query(id_list=value)
                 if not found:
@@ -146,21 +183,19 @@ def add(idents: list[str], role: str) -> list[str]:
             report.append(f'{ident}: ОШИБКА — {error}')
             continue
         rows.append(row)
-        registry.save(rows)
+        save(rows)
         added.append(row['code'])
         report.append(f"{row['code']}: {row['title']} ({row['version']}) — {got}")
-    catalog()
     return report + (search.index(added) if added else [])
 
 
 def add_file(source: str, title: str, authors: str, version: str, url: str, name: str, role: str) -> list[str]:
     """Добавляет источник без arXiv, MathNet и DOI: PDF или LaTeX по ссылке либо из локального файла."""
-    rows = registry.load()
-    row = dict(code=registry.next_code(rows), authors=authors, title=title, version=version, url=url, role=role)
+    rows = load()
+    row = dict(code=next_code(rows), authors=authors, title=title, version=version, url=url, role=role)
     rows.append(row)
     _attach(row, source, name, 'local')
-    registry.save(rows)
-    catalog()
+    save(rows)
     return [f"{row['code']}: {title} — {'PDF' if row.get('filename') else 'LaTeX'}"] + search.index([row['code']])
 
 
@@ -172,17 +207,16 @@ def _attach(row: dict, source: str, name: str, origin: str) -> str:
         row.pop('sha256', None)
         store.store_pdf(row, data, name + '.pdf')
         return 'PDF'
-    LIT.mkdir(parents=True, exist_ok=True)
-    (LIT / (name + '.tex')).write_text(papers.decode(data), encoding='utf-8', newline='\n')
+    paths.LIT.mkdir(parents=True, exist_ok=True)
+    (paths.LIT / (name + '.tex')).write_text(papers.decode(data), encoding='utf-8', newline='\n')
     row.update(tex=name + '.tex', tex_origin=origin)
     return 'LaTeX'
 
 
 def attach(code: str, source: str, origin: str = 'local') -> list[str]:
     """Прикрепляет к записи реестра PDF или LaTeX, полученный вручную."""
-    rows = registry.load()
-    row = registry.by_code(rows, code)
-    got = _attach(row, source, registry.stem_of(row), origin)
-    registry.save(rows)
-    catalog()
+    rows = load()
+    row = by_code(rows, code)
+    got = _attach(row, source, stem_of(row), origin)
+    save(rows)
     return [f"{row['code']}: прикреплён {got}"] + search.index([row['code']])

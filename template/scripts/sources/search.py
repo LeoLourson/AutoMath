@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import bisect
 import json
+import re
 import sqlite3
 from pathlib import Path
 
-from sources import papers, paths, tex, web
+from sources import papers, paths, registry, tex, web
 
 MODEL = 'intfloat/multilingual-e5-small'
 CHUNKER = 3  # увеличить после изменения нарезки: индекс пересоберётся
@@ -31,9 +32,9 @@ def embed(texts: list[str], prefix: str):
 
         def cached(name: str) -> str:
             try:
-                return hf_hub_download(search.MODEL, name, local_files_only=True)
+                return hf_hub_download(MODEL, name, local_files_only=True)
             except OSError:
-                return hf_hub_download(search.MODEL, name)
+                return hf_hub_download(MODEL, name)
 
         tokenizer = Tokenizer.from_file(cached('tokenizer.json'))
         tokenizer.enable_truncation(max_length=512)
@@ -63,7 +64,7 @@ def connect() -> sqlite3.Connection:
     paths.DB.parent.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(paths.DB)
     db.execute('create table if not exists meta(key text primary key, value text)')
-    version = f'{search.MODEL}:{search.CHUNKER}'
+    version = f'{MODEL}:{CHUNKER}'
     if db.execute("select value from meta where key = 'version'").fetchone() != (version,):
         with db:  # другая модель или нарезка: старый индекс несовместим
             for table in ('chunks', 'fts', 'papers'):
@@ -81,10 +82,10 @@ def connect() -> sqlite3.Connection:
 
 def text_file(row: dict) -> Path | None:
     """Файл для индекса: LaTeX, а без него текстовый слой PDF."""
-    if row.get('tex') and (LIT / row['tex']).exists():
-        return LIT / row['tex']
-    if row.get('filename') and (LIT / row['filename']).with_suffix('.txt').exists():
-        return (LIT / row['filename']).with_suffix('.txt')
+    if row.get('tex') and (paths.LIT / row['tex']).exists():
+        return paths.LIT / row['tex']
+    if row.get('filename') and (paths.LIT / row['filename']).with_suffix('.txt').exists():
+        return (paths.LIT / row['filename']).with_suffix('.txt')
     return None
 
 

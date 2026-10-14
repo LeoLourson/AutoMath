@@ -1,15 +1,16 @@
 """Состояние проекта: заготовки записей, шапки, сводки, проверки, аксиомы, статья.
 
 Записи результатов лежат в `results/`, идеи — в `ideas/`, карточки источников — в
-`sources/cards/`. Статус утверждения хранится в шапке его записи; `blueprint.md` и
-`ideas/README.md` собираются из шапок. Разбор шапки — общий с `sources/lit.py` (records.py),
-проверки — в `check/`, тексты сводок — в `state/summaries.py`, `lake` — в `host/lean.py`.
+`sources/cards/`. Статус утверждения хранится в шапке его записи; `blueprint.md`,
+`ideas/README.md` и `sources/catalog.md` собираются из шапок и реестра. Разбор шапки — общий
+с `sources/lit.py` (records.py), проверки — в `check/`, тексты сводок записей — в
+`state/summaries.py`, каталог источников — в `sources/catalog.py`, `lake` — в `host/lean.py`.
+Слой состояния верхний: он может импортировать `records`, `host`, `check` и `sources`.
 Команды: python scripts/state/proj.py -h.
 """
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import shutil
 import sys
@@ -22,6 +23,8 @@ import records  # noqa: E402
 from check import declarations, doctor as environment, hygiene, results as checks, structure  # noqa: E402
 from check import summaries as audit  # noqa: E402
 from host import lean  # noqa: E402
+from sources import catalog, paths  # noqa: E402
+from sources import registry as source_registry  # noqa: E402
 from state import aristotle, summaries  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]  # scripts/state/proj.py -> корень проекта
@@ -31,13 +34,18 @@ PAPER = 'paper/main.tex'
 
 
 def configure(root: Path) -> None:
-    """Читает project.toml; тесты вызывают с временным каталогом."""
+    """Читает project.toml; тесты вызывают с временным каталогом.
+
+    Заодно настраивает корень слоя источников: `sources.catalog` вызывается отсюда в том же
+    процессе, поэтому порядок импортов не должен решать, на какой проект он смотрит.
+    """
     global ROOT, LIB, AXIOMS, PAPER
     ROOT = Path(root)
     config = tomllib.loads((ROOT / 'project.toml').read_text(encoding='utf-8'))
     LIB = config['project']['lib']
     AXIOMS = set(config.get('lean', {}).get('allowed_axioms', records.DEFAULT_AXIOMS))
     PAPER = config.get('paper', {}).get('main', PAPER)
+    paths.configure(ROOT)
 
 
 configure(ROOT)
@@ -72,12 +80,13 @@ def set_field(ident: str, key: str, value: str) -> str:
 # ---------- проверки ----------
 
 def registry() -> tuple[set[str], set[str], set[str]]:
-    """Коды источников реестра; коды с карточкой; коды с карточкой, сверенной по PDF."""
-    path = ROOT / 'sources' / 'papers.json'
-    codes = {row['code'] for row in json.loads(path.read_text(encoding='utf-8'))} if path.exists() else set()
-    cards = [records.read_doc(card) for card in (ROOT / 'sources' / 'cards').glob('S*.md')]
-    return (codes, {card.path.stem for card in cards},
-            {card.path.stem for card in cards if card.meta.get('verified')})
+    """Коды источников реестра; коды с карточкой; коды с карточкой, сверенной по PDF.
+
+    Факты считает слой источников (`sources/registry.py::facts`), чтобы у каталога и у
+    проверки было одно правило, а не два расходящихся.
+    """
+    facts = source_registry.facts()
+    return facts.codes, facts.carded, facts.verified
 
 
 def check(fast: bool) -> tuple[int, list[str]]:
@@ -98,6 +107,9 @@ def check(fast: bool) -> tuple[int, list[str]]:
                   f'объявлений Lean: {len(index)}')
 
     errors += audit.stale(ROOT, summaries.summaries(ROOT, LIB, results, ideas, index))
+    # Каталог источников сверяется той же проверкой свежести; его текст собирает чистая
+    # функция, поэтому проверка по-прежнему ничего не пишет.
+    errors += audit.stale(ROOT, {rel(paths.CATALOG): catalog.text()})
 
     if not (ROOT / '.git').exists():
         warnings.append('каталог не под Git: git init')
@@ -139,18 +151,21 @@ def views(results: list[Doc], ideas: list[Doc], index: dict) -> dict[str, str]:
 
 
 def sync() -> list[str]:
-    """Собирает сводки записей и каталог источников; каталог строит lit, а не этот файл."""
+    """Собирает сводки записей и каталог источников в этом же процессе."""
     index = declarations.library(ROOT, LIB)
     written = []
     for name, text in views(docs('results', 'R'), docs('ideas', 'I'), index).items():
         (ROOT / name).parent.mkdir(parents=True, exist_ok=True)
         (ROOT / name).write_text(text, encoding='utf-8', newline='\n')
         written.append(name)
-    if (ROOT / 'sources' / 'papers.json').exists():
-        # Тот же интерпретатор и соседняя папка: каталог ведёт инструмент источников.
-        catalog = Path(__file__).resolve().parents[1] / 'sources' / 'lit.py'
-        code, output = lean.run(ROOT, [sys.executable, str(catalog), 'catalog', '--root', str(ROOT)])
-        written.append('sources/catalog.md' if not code else 'sources/catalog.md не собран: ' + output[-200:])
+    # Каталог собирает слой источников: без подпроцесса и разбора его вывода. Корень слоя
+    # выставлен в configure, поэтому он смотрит на тот же проект.
+    try:
+        catalog.catalog()
+    except (OSError, ValueError) as error:
+        written.append(f'sources/catalog.md не собран: {error}')
+    else:
+        written.append('sources/catalog.md')
     return written
 
 
@@ -184,7 +199,7 @@ def create(kind: str, title: str, depends: str = '', target: str = '', idea: str
     """Создаёт запись и возвращает путь к ней; для card title — код источника."""
     if kind != 'card':
         return rel(new(kind, title, depends=depends, target=target, idea=idea))
-    rows = json.loads((ROOT / 'sources' / 'papers.json').read_text(encoding='utf-8'))
+    rows = source_registry.load()
     row = next((row for row in rows if row['code'] == title.upper()), None)
     if row is None:
         raise SystemExit(f'Источника {title} нет в реестре.')

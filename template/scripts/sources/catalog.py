@@ -1,25 +1,19 @@
 """Каталог подборки: страница `sources/catalog.md`, статус источника, наличие карточки.
 
 Каталог — сводка реестра: что скачано, что сверено, чего не хватает. Ручных правок в нём
-не бывает, его пересобирает `lit.py catalog` и `proj.py sync`.
+не бывает. Сборка текста (`text`) отделена от записи (`catalog`): свежесть страницы сверяет
+`check/summaries.py`, а проверка не должна уметь писать, поэтому она берёт только чистую
+сборку. Запись обновляет статусы в `papers.json` и переписывает страницу.
+
+Строки «Обновлено <дата>» в тексте нет: с ней содержимое менялось бы каждые сутки и точная
+сверка свежести была бы невозможна. Когда страница правилась, видно в Git.
+
+Факты о подборке — коды реестра, коды с карточкой и коды со сверенной карточкой — считает
+`registry.facts()`: одно правило на каталог и на `proj.py check`.
 """
 from __future__ import annotations
 
-import re
-from datetime import date
-
-import records
-
 from sources import paths, registry
-def cards() -> set[str]:
-    """Коды источников, у которых есть карточка проверенных теорем."""
-    found: set[str] = set()
-    if paths.CARDS.exists():
-        found = {doc.id for doc in (records.read_doc(path) for path in paths.CARDS.glob('S*.md')) if doc.id}
-    if paths.RESULTS.exists():
-        headings = ' '.join(re.findall(r'^## (.*)$', paths.RESULTS.read_text(encoding='utf-8'), re.M))
-        found |= set(re.findall(r'S\d+', headings))
-    return found
 
 
 def status_of(row: dict, carded: set[str]) -> str:
@@ -28,23 +22,30 @@ def status_of(row: dict, carded: set[str]) -> str:
         have.append({'arxiv': 'LaTeX-исходник', 'transcription': 'LaTeX-транскрипция'}.get(row.get('tex_origin'), 'LaTeX'))
     if row.get('filename'):
         have.append('PDF' if row.get('text_layer', True) else 'PDF-скан без текстового слоя')
-    missing = [row[key] for key in ('tex', 'filename') if row.get(key) and not (LIT / row[key]).exists()]
+    missing = [row[key] for key in ('tex', 'filename') if row.get(key) and not (paths.LIT / row[key]).exists()]
     return ((', '.join(have) if have else 'Полного текста нет')
             + ('; карточка есть.' if row['code'] in carded else '; теоремы не проверены.')
             + (f" Нет файлов: {', '.join(missing)} — `python scripts/sources/lit.py fetch`." if missing else ''))
 
 
-def catalog() -> str:
-    rows, carded = registry.load(), cards()
+def marked(rows: list[dict], carded: set[str]) -> list[dict]:
+    """Копии строк реестра с пересчитанным полем status: сам реестр при сборке не меняется."""
+    found = [dict(row) for row in rows]
+    for row in found:
+        row['status'] = status_of(row, carded)
+    return found
+
+
+def page(rows: list[dict]) -> str:
+    """Текст страницы по строкам реестра со статусами."""
     out = [
         '# Подборка полных текстов', '',
-        f'Обновлено {date.today():%d.%m.%Y}. Работ в подборке: {len(rows)}. Файл собран командой '
+        f'Работ в подборке: {len(rows)}. Файл собран командой '
         '`python scripts/sources/lit.py catalog` из [papers.json](papers.json); правки вносятся в реестр. Тексты лежат в '
         '`output/literature/`, вне Git. Наличие полного текста не означает проверку его теорем. '
         'LaTeX-транскрипция сделана моделью по PDF: при расхождении первичен PDF.', '',
     ]
     for row in rows:
-        row['status'] = status_of(row, carded)
         links = [f"[Первичный источник]({row['url']})"]
         if row.get('pdf_url'):
             links.append(f"[полный текст]({row['pdf_url']})")
@@ -65,8 +66,21 @@ def catalog() -> str:
         if sums:
             out.append('**SHA-256:** ' + '; '.join(sums) + '.')
         out.append('')
+    return '\n'.join(out)
+
+
+def text() -> str:
+    """Чистая сборка текста каталога: ничего не пишет и реестр не меняет."""
+    facts = registry.facts()
+    return page(marked(registry.load(), facts.carded))
+
+
+def catalog() -> str:
+    """Пересобирает страницу каталога и статусы в papers.json; возвращает сообщение."""
+    facts = registry.facts()
+    rows = marked(registry.load(), facts.carded)
     if rows:
         registry.save(rows)
-    CATALOG.parent.mkdir(parents=True, exist_ok=True)
-    CATALOG.write_text('\n'.join(out), encoding='utf-8', newline='\n')
+    paths.CATALOG.parent.mkdir(parents=True, exist_ok=True)
+    paths.CATALOG.write_text(page(rows), encoding='utf-8', newline='\n')
     return f'Каталог пересобран, работ: {len(rows)}.'

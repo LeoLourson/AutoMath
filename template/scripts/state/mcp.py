@@ -5,19 +5,22 @@
 """MCP-сервер проекта: записи, идеи, сводки, проверки и формулировки Lean.
 
 Запускается из корня проекта: `uv run --directory . --script scripts/state/mcp.py`.
-Каталог скриптов попадает в sys.path при загрузке этого файла, корень проекта — из
-`--directory`.
+Каталог скриптов ставится в sys.path здесь же, корень проекта — из `--directory`.
 """
 import contextlib
 import functools
 import sys
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+# sys.path[0] — каталог этого файла; файл mcp.py перекрыл бы пакет `mcp`, поэтому он
+# заменяется каталогом scripts/: он же нужен импортам `from check import …` внутри proj.py.
+HERE = Path(__file__).resolve()
+sys.path[:] = [str(HERE.parents[1])] + [
+    entry for entry in sys.path if not entry or Path(entry).resolve() != HERE.parent]
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from mcp.server.fastmcp import FastMCP  # noqa: E402
 
-import proj  # noqa: E402
+from state import proj  # noqa: E402
 
 server = FastMCP('proj', instructions=(
     'Записи результатов (results/R*.md), идеи (ideas/I*.md), карточки источников и опыты проекта. '
