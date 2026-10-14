@@ -37,7 +37,7 @@ python tools/create.py --update ..\Spectra
 ```
 
 Обновление переписывает только то, чем владеет шаблон: `AGENTS.md`, `CLAUDE.md`,
-`scripts/`, `tests/`, `.claude/agents/`, `.claude/commands/`, `.claude/skills/`,
+`scripts/`, `.claude/agents/`, `.claude/commands/`, `.claude/skills/`,
 `DEEPSEEK.md`, `sources/README.md`, `experiments/README.md`, CI. Постановка, записи, идеи,
 источники, библиотека Lean, статья, `.mcp.json` и `.claude/settings.json` не трогаются.
 Файлы, которых в шаблоне больше нет, команда перечисляет, но не удаляет. Если в проекте

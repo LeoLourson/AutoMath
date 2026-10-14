@@ -14,8 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: leanprover/lean-action@v1
-      - name: Tool tests
-        run: python3 -m unittest discover tests
       - name: DeepSeek Harness artifacts
         run: |
           python3 scripts/host/harness.py prepare

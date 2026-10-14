@@ -57,7 +57,6 @@ preset Standard и модель в интерфейсе. Адаптер подк
 ```
 python scripts/state/proj.py check          # всё, включая lake build и аксиомы
 python scripts/state/proj.py check --fast   # без Lean
-python -m unittest discover tests     # сами инструменты
 ```
 
 Версии Lean и Mathlib закреплены в `lean-toolchain`, `lakefile.toml`, `lake-manifest.json`.

@@ -133,13 +133,12 @@ python tools/create.py --update ../Spectra
 ```sh
 python scripts/host/harness.py check
 python scripts/host/harness.py list
-python -m unittest discover tests
 python scripts/state/proj.py check --fast
 ```
 
-Тот же набор команд выполняет CI проекта (`.github/workflows/ci.yml`); проверка
-`harness.py check` там идёт после `prepare`, а `harness_runtime.mjs` сверяет patch со
-схемами закреплённой версии Harness.
+CI проекта (`.github/workflows/ci.yml`) выполняет те же проверки: `harness.py prepare`,
+затем `harness.py check` и `proj.py check`. Проверка patch схемами Harness живёт в наборе,
+в проекте её нет.
 
 `harness.py check` проверяет свежесть файлов, не запускает модель и ничего не пишет.
 Структуру итоговой конфигурации можно проверить самим Harness без запроса к модели:
@@ -147,20 +146,6 @@ python scripts/state/proj.py check --fast
 ```sh
 python scripts/host/harness.py run web -- --dump-config
 ```
-
-Проверка настоящими схемами и загрузчиком skills Harness (установка только в `output/`):
-
-```sh
-npm install --prefix output/harness/runtime @deepseek-ai/dsh@0.2.1-alpha.2
-node tests/template/harness_runtime.mjs output/harness/runtime/node_modules
-node tests/template/harness_runtime.mjs output/harness/runtime/node_modules --mcp
-```
-
-Последняя команда проверяет handshake и список инструментов каждого MCP-сервера,
-а также вызывает `proj.overview` и `lit.papers`. `uv` может скачать зависимости;
-вызовов модели и внешнего поиска в этом тесте нет. Общий `--dump-config-schema` в
-0.2.1-alpha.2 может завершаться ошибкой на встроенных Web presets; тест выше проверяет
-все записи patch непосредственно валидаторами их плагинов.
 
 При первом реальном запуске проверьте наличие `mcp__proj__overview`, `mcp__lit__papers`
 и инструментов `lean-lsp`, затем выполните `/ideas` на своей постановке. Ошибка запуска

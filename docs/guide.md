@@ -286,6 +286,19 @@ python tools/create.py --update ..\Spectra
 в `.claude/` или `.mcp.json` это делает `python scripts/host/harness.py prepare` или следующий
 `run`. Что получит Harness, показывает `python scripts/host/harness.py list`.
 
+Проверку patch настоящими схемами Harness запускайте из корня набора. Ей нужен каталог
+node_modules с закреплённым пакетом Harness — его печатает
+`python template/scripts/host/harness.py package`; подойдёт установка в отдельный каталог
+или кэш npx:
+
+```
+python template/scripts/host/harness.py prepare
+node tests/template/harness_runtime.mjs <каталог node_modules> [--mcp] [--project <каталог проекта>]
+```
+
+По умолчанию скрипт проверяет заготовку `template/`; ключ `--project` называет другой
+проект, а `--mcp` дополнительно поднимает MCP-серверы и сверяет их инструменты.
+
 ## Если что-то не работает
 
 - `proj.py check` печатает ошибки и замечания. Ошибки исправляются до новой работы;
@@ -297,8 +310,9 @@ python tools/create.py --update ..\Spectra
 - Имя из Mathlib, найденное внешним поиском, не существует — внешние сервисы индексируют
   другую версию. Имя проверяется в закреплённой Mathlib проекта; этим занят агент
   `mathlib-scout`.
-- Инструменты ведут себя странно после правки `scripts/` —
-  `python -m unittest discover tests`.
+- Инструменты ведут себя странно после правки `scripts/`: python-тесты набора
+  (`python -m unittest discover -s tests/template`, `python -m unittest discover -s tests/kit`)
+  запускаются из корня набора; в самом проекте python-тестов нет.
 - В Harness нет команды, роли или инструмента MCP. `python scripts/host/harness.py list`
   показывает, что адаптер собрал; `python scripts/host/harness.py check` — устарели ли
   производные файлы. Запуск идёт только через `harness.py run` или с ключом `--patch`,

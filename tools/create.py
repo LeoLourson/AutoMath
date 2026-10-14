@@ -4,7 +4,7 @@
     python tools/create.py --update ПРОЕКТ [--dry-run]
 
 Создание копирует весь шаблон и подставляет имя библиотеки и название. Обновление
-переписывает только инструменты (правила, скрипты, агентов, команды, тесты); постановка,
+переписывает только инструменты (правила, скрипты, агентов, команды); постановка,
 записи, идеи, источники, библиотека Lean и статья не трогаются.
 
 Команды ниже в подсказках выполняются уже в папке созданного проекта, где этот файл
@@ -24,7 +24,7 @@ from pathlib import Path
 
 TEMPLATE = Path(__file__).resolve().parent.parent / 'template'
 # Файлы, которыми владеет шаблон: обновление переписывает их в проекте
-TOOLING = ['AGENTS.md', 'CLAUDE.md', 'DEEPSEEK.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
+TOOLING = ['AGENTS.md', 'CLAUDE.md', 'DEEPSEEK.md', 'scripts/*', '.claude/agents/*', '.claude/commands/*',
            '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml']
 SKIP = {'__pycache__', '.git', '.dsh', 'output', '.lake'}
 
@@ -138,7 +138,7 @@ def update(target: Path, dry: bool) -> None:
             raise SystemExit(message)
         print(message)
     if changed and not dry:
-        print('Проверьте: python -m unittest discover tests; python scripts/state/proj.py check --fast')
+        print('Проверьте: python scripts/state/proj.py check --fast')
     if not dry:
         prepare_harness(target)
     else:
