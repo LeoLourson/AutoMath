@@ -9,6 +9,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location('create_project', REPO / 'tools/create.py')
@@ -71,6 +72,50 @@ class ProjectGeneration(unittest.TestCase):
             create_project.update(self.root, False)
         self.assertIn(command, str(stopped.exception))
         self.assertTrue(skill.is_file())
+
+    def fake_subprocess(self, sync_code, stdout=b'', stderr=b''):
+        """Подменяет subprocess у create_project: sync отвечает заданным итогом."""
+        calls = []
+
+        class Result:
+            def __init__(self, returncode, out=b'', err=b''):
+                self.returncode, self.stdout, self.stderr = returncode, out, err
+
+        class Fake:
+            @staticmethod
+            def run(command, **options):
+                calls.append(command)
+                return Result(sync_code, stdout, stderr) if 'sync' in command else Result(0)
+
+        patcher = mock.patch.object(create_project, 'subprocess', Fake)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return calls
+
+    def test_failed_sync_stops_creation_and_shows_what_it_printed(self):
+        target = Path(self.temp.name) / 'Broken'
+        calls = self.fake_subprocess(3, stdout=b'sources/catalog.md\n',
+                                     stderr='Ключ --root неизвестен.\n'.encode('utf-8'))
+        with self.assertRaises(SystemExit) as stopped:
+            create_project.create(target, 'Broken', 'Несобранные сводки', None, False)
+        message = str(stopped.exception)
+        self.assertIn('scripts/state/proj.py sync', message)
+        self.assertIn('кодом 3', message)
+        self.assertIn('sources/catalog.md', message)
+        self.assertIn('Ключ --root неизвестен.', message)
+        # Создание остановлено на sync: до prepare дело не дошло, копии на месте
+        self.assertEqual([command[1:] for command in calls], [['scripts/state/proj.py', 'sync']])
+        self.assertTrue((target / 'project.toml').is_file())
+
+    def test_successful_sync_stays_quiet(self):
+        target = Path(self.temp.name) / 'Quiet'
+        calls = self.fake_subprocess(0, stdout=b'blueprint.md\nideas/README.md\nsources/catalog.md\n')
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            create_project.create(target, 'Quiet', 'Тихие сводки', None, False)
+        self.assertIn('Проект создан', output.getvalue())
+        self.assertNotIn('blueprint.md', output.getvalue())
+        self.assertEqual(len(calls), 2)
 
     def test_upgrade_adds_deepseek_and_preserves_research_and_user_settings(self):
         owned = ('question.md', 'PROJECT.md', 'project.toml', 'paper/main.tex',

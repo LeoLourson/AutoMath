@@ -42,6 +42,17 @@ def render(data: bytes, lib: str, title: str) -> bytes:
     return text.replace('__LIB__', lib).replace('__TITLE__', title).encode('utf-8')
 
 
+def output_tail(result: subprocess.CompletedProcess, lines: int = 20) -> str:
+    """Хвост stdout и stderr команды — чтобы падение было видно в сообщении."""
+    parts = []
+    for name, stream in (('stdout', result.stdout), ('stderr', result.stderr)):
+        text = stream.decode('utf-8', errors='replace') if isinstance(stream, bytes) else (stream or '')
+        text = text.strip()
+        if text:
+            parts.append(f'--- {name} ---\n' + '\n'.join(text.splitlines()[-lines:]))
+    return '\n'.join(parts)
+
+
 def prepare_harness(target: Path) -> None:
     subprocess.run([sys.executable, str(target / 'scripts/host/harness.py'), 'prepare'],
                    cwd=target, check=True)
@@ -71,7 +82,16 @@ def create(target: Path, lib: str, title: str, pins: Path | None, git: bool) -> 
     if git and shutil.which('git'):
         subprocess.run(['git', 'init', '--quiet'], cwd=target, check=False)
     # Сводки собираются сразу, чтобы первая проверка проекта прошла
-    subprocess.run([sys.executable, 'scripts/state/proj.py', 'sync'], cwd=target, check=False, capture_output=True)
+    summary = subprocess.run([sys.executable, 'scripts/state/proj.py', 'sync'],
+                             cwd=target, check=False, capture_output=True)
+    if summary.returncode:
+        raise SystemExit(
+            f'Проект создан: {target}\n'
+            'Но сводки не собраны: python scripts/state/proj.py sync завершилась с кодом '
+            f'{summary.returncode}.\n'
+            'Скопированные файлы оставлены на месте. Исправьте причину и повторите из папки проекта:\n'
+            '  python scripts/state/proj.py sync\n'
+            'Вывод команды:\n' + output_tail(summary))
     prepare_harness(target)
     print(f'Проект создан: {target}\n\nДальше, из папки проекта:\n'
           '  lake exe cache get                  # готовая сборка Mathlib\n'
