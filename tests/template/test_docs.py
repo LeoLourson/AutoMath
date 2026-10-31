@@ -23,7 +23,7 @@ sys.path.insert(0, str(TEMPLATE / 'scripts' / 'host'))
 import harness  # noqa: E402
 
 # Инструкции набора: адресованы тому, кто создаёт проект, поэтому лежат вне заготовки.
-KIT_DOCS = (REPO / 'README.md', REPO / 'docs/guide.md')
+KIT_DOCS = (REPO / 'README.md', REPO / 'docs/howto/guide.md')
 # Инструкции проекта: создание копирует их в корень нового проекта.
 PROJECT_DOCS = (TEMPLATE / 'README.md', TEMPLATE / 'AGENTS.md', TEMPLATE / 'DEEPSEEK.md')
 # Появляются при работе: сводки собирает proj.py sync, каталог — lit.py, записи и опыты

@@ -5,8 +5,8 @@ Harness: постановка, источники, идеи с независи�
 формализация в Lean 4 с проверкой соответствия, статья. От темы шаблон не зависит: всё
 тематическое живёт в двух файлах нового проекта, `question.md` и `PROJECT.md`.
 
-Порядок работы и возможности для нового пользователя — в [docs/guide.md](docs/guide.md).
-Как устроен сам набор — в [docs/architecture.md](docs/architecture.md).
+Порядок работы и возможности для нового пользователя — в [docs/howto/guide.md](docs/howto/guide.md).
+Как устроен сам набор — в [docs/concept/architecture.md](docs/concept/architecture.md).
 
 ## Новый проект
 
@@ -79,7 +79,7 @@ python template/scripts/host/harness.py --root template list
 Такое деление — по назначению, а не по типу файла: всё, что копируется в проект, лежит
 целиком в `template/`, а всё, что описывает и проверяет копирование, — вне него. Поэтому
 `PROJECT.md`, `question.md` и остальные файлы заготовки не встречаются в двух местах.
-Полный разбор с обоснованием — в [docs/architecture.md](docs/architecture.md).
+Полный разбор с обоснованием — в [docs/concept/architecture.md](docs/concept/architecture.md).
 
 ## Требования
 

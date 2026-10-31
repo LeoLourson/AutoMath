@@ -48,7 +48,7 @@ python scripts/state/proj.py check
 Для DeepSeek Harness запустите `python scripts/host/harness.py run web`, выберите папку
 проекта и preset Standard, настройте модель и ключ в интерфейсе Harness. Создание
 проекта уже подготовило skills, роли и MCP; запуск обновит их при необходимости.
-Полная инструкция — [DEEPSEEK.md](../template/DEEPSEEK.md), она также лежит в созданном проекте.
+Полная инструкция — [DEEPSEEK.md](../../template/DEEPSEEK.md), она также лежит в созданном проекте.
 
 ## Шаг 2. Записать постановку
 
