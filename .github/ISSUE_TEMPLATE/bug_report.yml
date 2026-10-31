@@ -1,0 +1,40 @@
+name: Bug report
+description: A tool in the kit or in a created project errors, computes wrong, or refuses valid input.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do not paste model API keys, MCP credentials, or private
+        manuscript text.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command or agent action, its result, and what you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: |
+        The `python tools/create.py ...` command line or the command inside the project
+        (`/day`, `proj.py check`, ...), plus a minimal excerpt of `question.md` or
+        `PROJECT.md` when the failure depends on the topic.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Traceback or log
+      description: The output of the command or the Harness run report.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Python, OS, the agent environment (Claude Code or DeepSeek Harness), and the commit or release.
+      placeholder: "3.12.8, Windows 11, DeepSeek Harness, v0.1.0"
+    validations:
+      required: true

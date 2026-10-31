@@ -1,0 +1,32 @@
+name: Feature request
+description: A new command, agent role, skill layer, script check, or Harness capability.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What cannot be done today, in the kit or in a created project.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The command or agent action, its input and output, and how it fits the workflow in `template/AGENTS.md`.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - create and update tooling (tools/create.py)
+        - project scripts (scripts/state)
+        - sources and literature (scripts/sources)
+        - template agents (.claude/agents)
+        - template commands (.claude/commands)
+        - text skills (.claude/skills)
+        - DeepSeek Harness adapter
+        - Lean / Mathlib setup
+        - documentation

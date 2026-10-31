@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://github.com/LeoLourson/AutoMath/blob/main/docs/README.md
+    about: The guide, the architecture, and the reading order.
+  - name: DeepSeek Harness setup
+    url: https://github.com/LeoLourson/AutoMath/blob/main/template/DEEPSEEK.md
+    about: Running the Harness, headless mode, and the Claude Code mapping.
+  - name: Questions
+    url: https://github.com/LeoLourson/AutoMath/discussions
+    about: Ask how to set up a topic or adapt the workflow.
