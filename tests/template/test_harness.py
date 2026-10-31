@@ -23,7 +23,10 @@ class HarnessAdapter(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='research harness ')
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name) / 'project with spaces'
+        # resolve(): на Windows-раннерах TEMP задан коротким именем 8.3 (RUNNER~1),
+        # а harness.py сравнивает пути через Path.resolve(); без resolve() сравнения
+        # RUNNER~1 != runneradmin роняют тесты только на Windows.
+        self.root = (Path(self.temp.name) / 'project with spaces').resolve()
         shutil.copytree(PROJECT, self.root, ignore=shutil.ignore_patterns(
             '.git', '.lake', '.dsh', 'output', '__pycache__'))
 
