@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use AutoMath in academic work, cite it as below."
+title: "AutoMath: an agent workspace for research mathematics with sources, review, and Lean 4"
+abstract: "A project template and tooling that let Claude Code or DeepSeek Harness agents carry a mathematical topic from sources and refereed ideas to a proof formalized in Lean 4 with fidelity checks and a LaTeX paper."
+authors:
+  - name: "LeoLourson"
+repository-code: "https://github.com/LeoLourson/AutoMath"
+url: "https://github.com/LeoLourson/AutoMath"
+license: MIT
+version: 0.1.0
+date-released: 2026-10-31
+keywords:
+  - Lean 4
+  - Mathlib
+  - formalization
+  - research agents
+  - Claude Code
+  - MCP
