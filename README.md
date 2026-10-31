@@ -1,4 +1,10 @@
-# Шаблон проекта: математика, источники, Lean
+# AutoMath
+
+[Русский](README.md) | [English](README.en.md) | [中文](README.zh.md)
+
+[![CI](https://github.com/LeoLourson/AutoMath/actions/workflows/ci.yml/badge.svg)](https://github.com/LeoLourson/AutoMath/actions/workflows/ci.yml)
+[![MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](docs/howto/guide.md)
 
 Набор для исследовательского проекта, который ведут агенты Claude Code или DeepSeek
 Harness: постановка, источники, идеи с независимой критикой, доказательства с рецензией,
@@ -103,3 +109,11 @@ Python 3.11 или новее, `uv`, `elan` с `lake`, `git`; `pdflatex` — д�
 | `template/.claude/skills/` | слои математического текста: содержание — `math-rigor`, композиция — `paper-canvas`, стиль автора — `shkalikov-style`, язык — `paper-de-ai`, набор — `math-typeset` |
 | `tests/template/` | тесты инструментов без сети и без Lean; `harness_runtime.mjs` сверяет patch со схемами Harness |
 | `tests/kit/` | тесты создания и обновления проекта |
+
+## Лицензия и участие
+
+Правила участия и процесс релизов — в [CONTRIBUTING.md](CONTRIBUTING.md); уязвимости
+сообщаются приватно через [SECURITY.md](SECURITY.md); ожидания по общению —
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). Код под лицензией MIT,
+см. [LICENSE](LICENSE). Цитирование набора в академических работах описано
+в [CITATION.cff](CITATION.cff), история версий — в [CHANGELOG.md](CHANGELOG.md).
