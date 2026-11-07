@@ -135,6 +135,7 @@ class ProjectRecords(unittest.TestCase):
         self.assertEqual((first.name, second.name), ('R01.md', 'R02.md'))
         doc = records.read_doc(second)
         self.assertEqual((doc.meta['id'], doc.meta['status'], doc.meta['depends']), ('R02', 'цель', ['R01']))
+        self.assertEqual(doc.meta['final'], 'false')
         self.assertEqual(records.read_doc(first).meta['title'], 'Первая: с двоеточием')
         proj.set_field('R02', 'lean', 'Demo.const_even, Demo.scaled_even')
         self.assertEqual(proj.find_doc('R02').meta['lean'], ['Demo.const_even', 'Demo.scaled_even'])
@@ -175,6 +176,53 @@ class ProjectRecords(unittest.TestCase):
         self.assertIn('R01 --> R02', views['blueprint.md'])
         self.assertIn('| `Demo/Basic.lean` | Пример: theorem в комментарии не считается', views['blueprint.md'])
         self.assertIn('| [I01](I01.md) | Попробовать индукцию | R02 | новая |', views['ideas/README.md'])
+
+    def test_final_record_needs_lean(self):
+        """`final: true` без поля lean — ошибка: итоговая теорема не проверяется аксиомами."""
+        proj.new('result', 'Итоговая')
+        proj.set_field('R01', 'final', 'true')
+        errors, _ = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
+        self.assertIn('final: true требует поля lean', '\n'.join(errors))
+        proj.set_field('R01', 'lean', 'Demo.const_even')
+        errors, _ = checks.check_records(self.root, proj.docs('results', 'R'), set(), set(), self.index)
+        self.assertNotIn('final: true требует поля lean', '\n'.join(errors))
+
+    def test_status_fragment_and_finals_go_into_views(self):
+        """Сводки включают фрагмент статьи и список итоговых теорем."""
+        proj.new('result', 'Опора')
+        proj.set_field('R01', 'lean', 'Demo.const_even')
+        proj.set_field('R01', 'final', 'true')
+        views = proj.views(proj.docs('results', 'R'), proj.docs('ideas', 'I'), self.index)
+        self.assertIn('paper/generated/status.tex', views)
+        self.assertIn('R01 & цель &', views['paper/generated/status.tex'])
+        self.assertIn('const', views['paper/generated/status.tex'])
+        self.assertIn('## Итоговые теоремы', views['blueprint.md'])
+        self.assertIn('R01 — Опора', views['blueprint.md'])
+
+    def test_ledger_lists_only_final_theorems(self):
+        """Реестр аксиом собирается из записей `final: true`, а не из всех записей."""
+        proj.new('result', 'Итог')
+        proj.set_field('R01', 'lean', 'Demo.const_even')
+        proj.set_field('R01', 'final', 'true')
+        proj.new('result', 'Промежуточная')
+        proj.set_field('R02', 'lean', 'Demo.scaled_even')
+        proj.ledger()
+        text = (self.root / 'output' / 'generated' / 'Axioms.lean').read_text(encoding='utf-8')
+        self.assertIn('#print axioms Demo.const_even', text)
+        self.assertNotIn('#print axioms Demo.scaled_even', text)
+        self.assertIn('import Demo', text)
+
+    def test_expositions_are_discovered_by_name(self):
+        """Экспозиции — `paper/exposition*.tex`; `--all` берёт основную статью и их."""
+        (self.root / 'paper').mkdir()
+        for name in ('main.tex', 'exposition.tex', 'exposition-G.tex', 'notes.txt'):
+            (self.root / 'paper' / name).write_text('x', encoding='utf-8')
+        names = [path.name for path in proj.exposed()]
+        self.assertEqual(names[0], 'main.tex')
+        self.assertIn('exposition.tex', names)
+        self.assertIn('exposition-G.tex', names)
+        self.assertNotIn('notes.txt', names)
+        self.assertEqual(proj.tex(name='absent'), 1)
 
     def test_hygiene_ignores_comments(self):
         errors, _ = hygiene.check_hygiene(self.root, 'Demo')
@@ -260,6 +308,33 @@ class Sources(unittest.TestCase):
                 _, report = proj.check(fast=True)
                 self.assertIn('sources/catalog.md устарел: python scripts/state/proj.py sync',
                               '\n'.join(report))
+            finally:
+                _as_template()
+
+    def test_annotate_records_description_and_audit_sees_gaps(self):
+        """Описание пишется в реестр и попадает в каталог; `audit` видит источники без него."""
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            self.catalog_project(root)
+            try:
+                proj.configure(root)
+                self.assertIn('S2: описания нет', '\n'.join(lit.audit()))
+                given = {'S2': {'kind': 'статья',
+                                'object': 'Спектральная задача второго порядка с отражением аргумента ' * 2,
+                                'results': ['Теорема 1.1, с. 5'], 'methods': ['резольвента'],
+                                'related': ['S1'], 'keywords': ['базис', 'спектр', 'bases'],
+                                'basis': 'аннотация'}}
+                payload = root / 'about.json'
+                payload.write_text(json.dumps(given, ensure_ascii=False), encoding='utf-8')
+                with patch.object(lit, 'index_texts', return_value=[]):
+                    lit.annotate(str(payload))
+                row = next(row for row in source_registry.load() if row['code'] == 'S2')
+                self.assertEqual(row['about']['kind'], 'статья')
+                self.assertEqual(row['about']['related'], ['S1'])
+                page = (root / 'sources' / 'catalog.md').read_text(encoding='utf-8')
+                self.assertIn('**О чём** (статья', page)
+                self.assertIn('**Ключевые слова:** базис, спектр, bases.', page)
+                self.assertNotIn('S2: описания нет', '\n'.join(lit.audit()))
             finally:
                 _as_template()
 

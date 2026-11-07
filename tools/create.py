@@ -25,7 +25,8 @@ from pathlib import Path
 TEMPLATE = Path(__file__).resolve().parent.parent / 'template'
 # Файлы, которыми владеет шаблон: обновление переписывает их в проекте
 TOOLING = ['AGENTS.md', 'CLAUDE.md', 'DEEPSEEK.md', 'scripts/*', 'tests/*', '.claude/agents/*', '.claude/commands/*',
-           '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml']
+           '.claude/skills/*', 'sources/README.md', 'experiments/README.md', '.github/workflows/ci.yml',
+           'paper/exposition-template.tex']
 SKIP = {'__pycache__', '.git', '.dsh', 'output', '.lake'}
 
 

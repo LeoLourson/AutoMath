@@ -1,6 +1,8 @@
 """Каталог подборки: страница `sources/catalog.md`, статус источника, наличие карточки.
 
-Каталог — сводка реестра: что скачано, что сверено, чего не хватает. Ручных правок в нём
+Каталог — сводка реестра: что скачано, что сверено, чего не хватает и о чём источник.
+Описание (`about`) приходит из реестра; страница только раскладывает его на разделы «О чём»,
+«Результаты», «Методы», «Связанные источники», «Ключевые слова». Ручных правок в нём
 не бывает. Сборка текста (`text`) отделена от записи (`catalog`): свежесть страницы сверяет
 `check/summaries.py`, а проверка не должна уметь писать, поэтому она берёт только чистую
 сборку. Запись обновляет статусы в `papers.json` и переписывает страницу.
@@ -13,7 +15,27 @@
 """
 from __future__ import annotations
 
+from datetime import date
+
 from sources import paths, registry
+
+
+def about_markdown(row: dict) -> list[str]:
+    """Описание источника разделами страницы; при отсутствии описания — строка «Описание: нет»."""
+    about = row.get('about')
+    if not about:
+        return ['**Описание:** нет. Источник не прочитан: `python scripts/sources/lit.py annotate`.']
+    try:
+        stamp = date.fromisoformat(about.get('date') or '').strftime('%d.%m.%Y')
+    except (TypeError, ValueError):
+        stamp = 'дата не записана'
+    out = [f"**О чём** ({about.get('kind', '')}; описано {stamp}, "
+           f"основание — {about.get('basis', '')}): {about.get('object', '')}"]
+    for title, key in (('Результаты', 'results'), ('Методы', 'methods'), ('Связанные источники', 'related')):
+        if about.get(key):
+            out += ['', f'**{title}:**', ''] + [f'- {item}' for item in about[key]] + ['']
+    out.append('**Ключевые слова:** ' + ', '.join(about.get('keywords', [])) + '.')
+    return out
 
 
 def status_of(row: dict, carded: set[str]) -> str:
@@ -62,6 +84,7 @@ def page(rows: list[dict]) -> str:
                 f"**Авторы:** {row['authors']}. **Версия:** {row['version']}.",
                 '; '.join(links) + '.',
                 f"{volume}**Статус:** {row['status']}",
+                *about_markdown(row), '',
                 f"**Связь с проектом:** {row['role']}"]
         if sums:
             out.append('**SHA-256:** ' + '; '.join(sums) + '.')

@@ -193,19 +193,27 @@ def crossref_meta(doi: str) -> dict:
     )
 
 
-def crossref_search(query: str, limit: int, prefix: str) -> list[dict]:
-    params = urllib.parse.urlencode({'query.bibliographic': query, 'filter': 'prefix:' + prefix, 'rows': limit,
-                                     'select': 'DOI,title,author,issued,container-title'})
+def crossref_search(query: str, limit: int, prefix: str | None = None) -> list[dict]:
+    """Поиск в Crossref. prefix ограничивает издателя (10.4213 — журналы MathNet), None — весь Crossref."""
+    params = {'query.bibliographic': query, 'rows': limit,
+              'select': 'DOI,title,author,issued,container-title,volume,issue,page,abstract'}
+    if prefix:
+        params['filter'] = 'prefix:' + prefix
     papers = []
-    for item in json.loads(web.http_get('https://api.crossref.org/works?' + params))['message']['items']:
+    for item in json.loads(web.http_get('https://api.crossref.org/works?' + urllib.parse.urlencode(params)))['message']['items']:
         doi = item['DOI']
+        place = ', '.join(part for part in (
+            (item.get('container-title') or [''])[0],
+            ' '.join(filter(None, [item.get('volume'), f"({item['issue']})" if item.get('issue') else ''])),
+            item.get('page')) if part)
         papers.append(dict(
             mathnet=doi.split('/', 1)[1].lower() if doi.startswith('10.4213/') else None,
             doi=doi,
             title=web.squash((item.get('title') or ['?'])[0]),
-            authors=[web.squash(f"{a.get('given', '')} {a.get('family', '')}") for a in item.get('author', [])],
+            authors=[web.squash(f"{a.get('given', '')} {a.get('family', '')}")
+                     for a in item.get('author', []) if a.get('family') or a.get('given')],
             year=((item.get('issued') or {}).get('date-parts') or [['']])[0][0],
-            abstract=(item.get('container-title') or [''])[0],
+            abstract=web.squash(' '.join(filter(None, [place, web.html_text(item.get('abstract') or '')]))),
         ))
     return papers
 
@@ -241,6 +249,73 @@ def scholar(ref: str, references: bool, limit: int) -> list[dict]:
                                year=paper.get('year'), authors=[a['name'] for a in paper.get('authors') or []],
                                abstract=web.squash(paper.get('abstract'))))
     return papers
+
+
+def _openalex_abstract(item: dict) -> str:
+    """Собирает аннотацию OpenAlex из обратного индекса слов."""
+    pos = {}
+    for word, places in (item.get('abstract_inverted_index') or {}).items():
+        for place in places:
+            pos[place] = word
+    return web.squash(' '.join(pos[key] for key in sorted(pos)))
+
+
+def _openalex_paper(item: dict) -> dict:
+    doi = (item.get('doi') or '').replace('https://doi.org/', '').lower()
+    biblio = item.get('biblio') or {}
+    source = ((item.get('primary_location') or {}).get('source') or {}).get('display_name', '')
+    place = ', '.join(part for part in (
+        source,
+        ' '.join(filter(None, [biblio.get('volume'), f"({biblio['issue']})" if biblio.get('issue') else ''])),
+        '-'.join(filter(None, [biblio.get('first_page'), biblio.get('last_page')])) if biblio.get('first_page') else '') if part)
+    return dict(doi=doi or None, openalex=item.get('id'),
+                title=web.squash(item.get('title')),
+                authors=[a.get('author', {}).get('display_name', '') for a in item.get('authorships') or []],
+                year=str(item.get('publication_year') or ''),
+                abstract=web.squash(' '.join(filter(None, [place, _openalex_abstract(item)]))),
+                cited_by=item.get('cited_by_count'))
+
+
+def openalex_search(query: str, limit: int) -> list[dict]:
+    params = urllib.parse.urlencode({'search': query, 'per-page': limit, 'mailto': 'lit@project.local'})
+    items = json.loads(web.http_get('https://api.openalex.org/works?' + params)).get('results') or []
+    return [_openalex_paper(item) for item in items]
+
+
+def openalex_meta(doi: str) -> dict:
+    url = ('https://api.openalex.org/works/https://doi.org/' + urllib.parse.quote(doi, safe=':/')
+           + '?mailto=lit@project.local')
+    item = json.loads(web.http_get(url))
+    paper = _openalex_paper(item)
+    location = item.get('best_oa_location') or {}
+    paper['pdf_url'] = location.get('pdf_url')
+    paper['referenced'] = item.get('referenced_works') or []
+    return paper
+
+
+def s2_search(query: str, limit: int) -> list[dict]:
+    url = ('https://api.semanticscholar.org/graph/v1/paper/search?query=' + urllib.parse.quote(query)
+           + f'&limit={limit}&fields=title,authors,year,venue,externalIds,abstract')
+    papers = []
+    for item in json.loads(web.http_get(url)).get('data') or []:
+        external = item.get('externalIds') or {}
+        papers.append(dict(arxiv=external.get('ArXiv'), doi=external.get('DOI'), title=item.get('title') or '',
+                           year=item.get('year'),
+                           authors=[a['name'] for a in item.get('authors') or []],
+                           abstract=web.squash(' '.join(filter(None, [item.get('venue'), item.get('abstract')])))))
+    return [paper for paper in papers if paper['title']]
+
+
+def openalex_citing(doi: str, limit: int) -> list[dict]:
+    meta = openalex_meta(doi)
+    if not meta.get('openalex'):
+        return []
+    work = meta['openalex'].rsplit('/', 1)[-1]
+    url = ('https://api.openalex.org/works?filter=cites:' + work
+           + f'&per-page={limit}&mailto=lit@project.local')
+    return [_openalex_paper(item) for item in json.loads(web.http_get(url)).get('results') or []]
+
+
 def describe(papers: list[dict]) -> str:
     seen, out = registry.known(registry.load()), []
     for paper in papers:
@@ -258,38 +333,90 @@ def describe(papers: list[dict]) -> str:
 
 
 def find(query: str, where: str | None = None, limit: int = 15) -> str:
-    """Кандидаты из zbMATH, arXiv и журналов MathNet.
+    """Кандидаты из zbMATH, arXiv, Crossref, OpenAlex, Semantic Scholar и журналов MathNet.
 
-    Простой текст без where идёт в zbMATH и arXiv. Синтаксис полей у каждого свой: в arXiv —
-    all:, ti:, abs:, au:, AND, OR; в zbMATH — ti:, au:, py:, &, |. С такими полями нужен where.
+    Простой текст без where идёт в zbMATH и arXiv; where=all — во все базы, кроме Semantic Scholar
+    (у неё низкий лимит запросов). Синтаксис полей у каждого свой: в arXiv — all:, ti:, abs:, au:,
+    AND, OR; в zbMATH — ti:, au:, py:, &, |. С такими полями нужен where.
     """
+    engines = [where] if where else ['zbmath', 'arxiv']
+    if where == 'all':
+        engines = ['zbmath', 'arxiv', 'crossref', 'openalex']
     out = []
-    for engine in ([where] if where else ['zbmath', 'arxiv']):
-        if engine == 'zbmath':
-            found = zbmath_search(query, limit)
-        elif engine == 'arxiv':
-            words = query if re.search(r'\b(all|ti|abs|au|cat):', query) else \
-                ' AND '.join('all:' + word for word in re.findall(r'"[^"]+"|\S+', query))
-            found = arxiv_query(search_query=words, max_results=limit, sortBy='relevance')
-        elif engine == 'mathnet':
-            found = crossref_search(query, limit, '10.4213')
-        else:
-            raise SystemExit(f'Неизвестная база «{engine}»: zbmath, arxiv или mathnet.')
+    for engine in engines:
+        try:
+            if engine == 'zbmath':
+                found = zbmath_search(query, limit)
+            elif engine == 'arxiv':
+                words = query if re.search(r'\b(all|ti|abs|au|cat):', query) else \
+                    ' AND '.join('all:' + word for word in re.findall(r'"[^"]+"|\S+', query))
+                found = arxiv_query(search_query=words, max_results=limit, sortBy='relevance')
+            elif engine == 'mathnet':
+                found = crossref_search(query, limit, '10.4213')
+            elif engine == 'crossref':
+                found = crossref_search(query, limit, None)
+            elif engine == 'openalex':
+                found = openalex_search(query, limit)
+            elif engine == 's2':
+                found = s2_search(query, limit)
+            else:
+                raise SystemExit(f'Неизвестная база «{engine}»: zbmath, arxiv, mathnet, crossref, openalex, s2 или all.')
+        except Exception as error:  # noqa: BLE001 — одна база не должна обрывать остальные
+            out.append(f'== {engine} ==\nОШИБКА: {error}')
+            continue
         out.append(f'== {engine} ==\n{describe(found)}')
     return '\n'.join(out)
 
 
 def cites(ref: str, references: bool = False, limit: int = 60) -> str:
-    """Работы, цитирующие источник (references — цитируемые им): MathNet или Semantic Scholar."""
+    """Кто цитирует источник (--refs — что цитирует он): OpenAlex, MathNet, Semantic Scholar.
+
+    OpenAlex — основной путь: даёт DOI и годы. MathNet — для русских журналов, у которых есть
+    идентификатор. Semantic Scholar — запасной, у него низкий лимит запросов.
+    """
     row = registry.by_code(registry.load(), ref) if re.fullmatch(r'[Ss]\d+', ref) else None
+    doi = None
     if row:
         if row.get('mathnet') and not references:
             return describe(mathnet_citing(row['mathnet'])[:limit])
-        ident = 'arXiv:' + registry.bare(registry.arxiv_id(row)) if registry.arxiv_id(row) else \
-            'DOI:' + (row.get('doi_en') or (registry.dois_of(row) or [''])[0])
+        doi = row.get('doi_en') or row.get('doi') or (registry.dois_of(row) or [None])[0]
+        ident = 'arXiv:' + registry.bare(registry.arxiv_id(row)) if registry.arxiv_id(row) else 'DOI:' + (doi or '')
     else:
         kind, value = registry.classify(ref)
         if kind == 'mathnet' and not references:
             return describe(mathnet_citing(value)[:limit])
         ident = {'arxiv': 'arXiv:' + registry.bare(value), 'mathnet': 'DOI:10.4213/' + value, 'doi': 'DOI:' + value}[kind]
+        doi = '10.4213/' + value if kind == 'mathnet' else (value if kind == 'doi' else None)
+    if doi and not references:
+        try:
+            found = openalex_citing(doi, limit)
+            if found:
+                return describe(found)
+        except Exception:  # noqa: BLE001 — запасной путь ниже
+            pass
     return describe(scholar(ident, references, limit))
+
+
+def doi_info(doi: str) -> str:
+    """Метаданные DOI из Crossref и OpenAlex: журнал, том, страницы, авторы, аннотация, открытый PDF."""
+    out = []
+    try:
+        meta = crossref_meta(doi)
+        out += ['== Crossref ==',
+                f"DOI:{meta['doi']} · {meta['year']} · {'; '.join(meta['authors'])}",
+                f"  {meta['title']}", f"  {meta['version']}"]
+    except Exception as error:  # noqa: BLE001 — вторая база может ответить
+        out.append(f'== Crossref ==\nОШИБКА: {error}')
+    try:
+        meta = openalex_meta(doi)
+        out += ['== OpenAlex ==',
+                f"DOI:{meta['doi']} · {meta['year']} · {'; '.join(meta['authors'])}",
+                f"  {meta['title']}"]
+        if meta.get('abstract'):
+            out.append(f"  АННОТАЦИЯ: {meta['abstract'][:900]}")
+        if meta.get('pdf_url'):
+            out.append(f"  ОТКРЫТЫЙ PDF: {meta['pdf_url']}")
+        out.append(f"  цитируют: {meta.get('cited_by')}")
+    except Exception as error:  # noqa: BLE001
+        out.append(f'== OpenAlex ==\nОШИБКА: {error}')
+    return '\n'.join(out)

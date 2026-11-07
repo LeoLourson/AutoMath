@@ -7,7 +7,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](docs/howto/guide.md)
 
 一套由 Claude Code 或 DeepSeek Harness 智能体主持的数学研究项目工具：问题设定、文献来源、
-经过独立批评的想法、经过评审的证明、带一致性检验的 Lean 4 形式化，直到论文。套件不依赖
+经过独立批评的想法、经过评审的证明、带一致性检验的 Lean 4 形式化，直到论文和独立阐述。套件不依赖
 具体课题：所有与课题相关的内容都只存在于新项目的两个文件中 —— `question.md` 和 `PROJECT.md`。
 
 工作流程和新用户可用的功能见 [docs/howto/guide.md](docs/howto/guide.md)（俄语）；套件本身的
@@ -41,7 +41,7 @@ python tools/create.py --update ..\Spectra
 
 更新只重写模板拥有的内容：`AGENTS.md`、`CLAUDE.md`、`scripts/`、`tests/`、`.claude/agents/`、
 `.claude/commands/`、`.claude/skills/`、`DEEPSEEK.md`、`sources/README.md`、
-`experiments/README.md`、CI。问题设定、记录、想法、来源、Lean 库、论文、`.mcp.json` 和
+`experiments/README.md`、CI，以及阐述模板 `paper/exposition-template.tex`。问题设定、记录、想法、来源、Lean 库、论文、`.mcp.json` 和
 `.claude/settings.json` 不会被改动。模板中已不存在的文件会被列出，但不会删除。如果项目中
 存在与模板命令同名的 skill，更新会停止并指出需要删除的 `.claude/skills/名称/` 目录：命令和
 skill 共用一个命名空间。
@@ -90,13 +90,13 @@ Python 3.11 或更新版本、`uv`、`elan`（含 `lake`）、`git`；`pdflatex`
 | 部分 | 内容 |
 | --- | --- |
 | `template/AGENTS.md` | 通用规则：项目地图、状态、智能体角色、检查项 |
-| `template/scripts/state/proj.py` | 记录底稿、头字段、摘要、检查、公理审计、陈述指纹、论文构建、Aristotle 包 |
+| `template/scripts/state/proj.py` | 记录底稿、头字段、摘要与 `paper/generated/status.tex`、检查、公理审计、陈述指纹、论文与阐述构建、最终定理的公理登记、Aristotle 包 |
 | `template/scripts/records.py` | 为 `proj.py` 和 `lit.py` 提供的统一带头记录解析：读取、写入、编号、底稿 |
-| `template/scripts/sources/lit.py` | 来源：zbMATH、arXiv、MathNet、DOI；转录；全文混合检索 |
+| `template/scripts/sources/lit.py` | 来源：zbMATH、arXiv、Crossref、OpenAlex、Semantic Scholar、MathNet、DOI；来源说明及其检查；转录；全文混合检索 |
 | `template/scripts/state/mcp.py` 与 `scripts/sources/mcp.py` | 同样的操作，作为 MCP 服务器 `proj` 和 `lit` |
 | `template/scripts/host/harness.py` | DeepSeek Harness：由 `.claude/` 和 `.mcp.json` 生成 skills、角色和 MCP，Cordis patch，Web/Headless 启动 |
 | `template/DEEPSEEK.md` | Harness 启动、Claude Code 工作流的迁移、检查项 |
-| `template/.claude/agents/` | 想法生成器、批评者、实验者、评审、形式化者、一致性检查、Mathlib 检索、文献检索、PDF 转录、卡片核对 |
+| `template/.claude/agents/` | 想法生成器、批评者、证明者（prover，把通过批评的想法写成记录）、实验者、评审、形式化者、一致性检查、Mathlib 检索、文献检索、PDF 转录、卡片核对 |
 | `template/.claude/commands/` | `/day`、`/ideas`、`/referee`、`/formalize`、`/fidelity`、`/sources`、`/transcribe`、`/exposition` |
 | `template/.claude/skills/` | 数学文本的层次：内容 —— `math-rigor`，结构 —— `paper-canvas`，作者风格 —— `shkalikov-style`，语言 —— `paper-de-ai`，排版 —— `math-typeset` |
 | `tests/template/` | 无网络、无 Lean 的工具测试；`harness_runtime.mjs` 将 patch 与 Harness 模式核对 |

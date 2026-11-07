@@ -102,6 +102,7 @@ sources: []
 lean: []
 review:
 fidelity:
+final: false
 ---
 
 ## Утверждение
@@ -124,6 +125,7 @@ target: {target}
 status: новая
 created: {today}
 critic:
+result:
 ---
 
 ## Формулировка

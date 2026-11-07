@@ -2,7 +2,8 @@
 
 Постановка — [question.md](question.md). Результаты, их статусы и зависимости —
 [blueprint.md](blueprint.md). Идеи — [ideas/](ideas/README.md). Источники —
-[sources/](sources/README.md). Статья — `paper/main.tex`.
+[sources/](sources/README.md). Статья — `paper/main.tex`; дополнительные экспозиции —
+`paper/exposition*.tex` по шаблону `paper/exposition-template.tex`.
 
 ## С чего начать
 
@@ -38,8 +39,9 @@ preset Standard и модель в интерфейсе. Адаптер подк
 | `experiments/` | опыты `E*/`: код, команда запуска, результат |
 | `sources/` | реестр `papers.json`, каталог, карточки теорем `cards/S*.md` |
 | `__LIB__/`, `__LIB__.lean` | библиотека Lean |
-| `paper/` | статья |
-| [blueprint.md](blueprint.md) | сводка записей и граф зависимостей; собирается из шапок |
+| `paper/` | статья `main.tex`, экспозиции `exposition*.tex` и их шаблон |
+| `paper/generated/status.tex` | производная таблица «запись — статус — объявление Lean»; собирает `proj.py sync` |
+| [blueprint.md](blueprint.md) | сводка записей, граф зависимостей, итоговые теоремы; собирается из шапок |
 | `scripts/` | `proj.py` — записи, проверки, сводки; `lit.py` — источники; `records.py` — общий разбор записей; MCP-серверы |
 | `.claude/` | агенты, команды, скиллы оформления текста |
 | `.dsh/skills/` | производные skills для Harness; собираются автоматически, в Git не входят |
@@ -57,7 +59,9 @@ preset Standard и модель в интерфейсе. Адаптер подк
 ```
 python scripts/state/proj.py check          # всё, включая lake build и аксиомы
 python scripts/state/proj.py check --fast   # без Lean
-python -m unittest discover tests     # сами инструменты
+python scripts/state/proj.py ledger         # output/generated/Axioms.lean из final: true
+python scripts/state/proj.py tex            # paper/main.tex; --name ИМЯ, --all
+python -m unittest discover tests           # сами инструменты
 ```
 
 Версии Lean и Mathlib закреплены в `lean-toolchain`, `lakefile.toml`, `lake-manifest.json`.

@@ -7,6 +7,11 @@
 Здесь же считается единственный набор фактов о подборке (`facts`): коды реестра, коды с
 карточкой и коды с карточкой, сверенной по PDF. Каталог и `proj.py check` выносят суждения
 по нему, а не по своим правилам.
+
+Описание источника (`about`) — тоже поле реестра: `kind`, `object`, `results`, `methods`,
+`related`, `keywords`, `basis`, `date`. Его разбирает `about_of`, а проверяет `check_about`;
+команды `annotate` и `audit` живут в фасаде `sources/lit.py`, потому что `audit` сверяет
+описание с полным текстом через поисковый модуль.
 """
 from __future__ import annotations
 
@@ -15,6 +20,7 @@ import json
 import re
 import urllib.error
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 import records
@@ -59,6 +65,64 @@ def facts() -> Facts:
         headings = ' '.join(re.findall(r'^## (.*)$', paths.RESULTS.read_text(encoding='utf-8'), re.M))
         carded |= set(re.findall(r'S\d+', headings))
     return Facts(codes, carded, {doc.id for doc in files if doc.id and doc.meta.get('verified')})
+
+
+# Описание источника — поле `about` записи реестра. Оно говорит, что в работе есть и на чём
+# это прочитано; поля перечислены здесь, потому что их проверяет реестр, а не каталог.
+KINDS = ('статья', 'краткое сообщение', 'обзор', 'книга', 'диссертация')
+BASES = ('полный текст', 'аннотация, введение и формулировки', 'аннотация', 'название и метаданные')
+UNFINISHED = re.compile(r'(?i)нужно сверить|нужно уточнить|предстоит|todo|\?\?')
+
+
+def about_of(given: dict) -> dict:
+    """Описание источника из присланного JSON: известные поля и дата составления."""
+    about = {key: given[key] for key in ('kind', 'object', 'results', 'methods', 'related', 'keywords', 'basis')
+             if given.get(key)}
+    about['date'] = given.get('date') or date.today().isoformat()
+    return about
+
+
+def check_about(row: dict, about: dict, rows: list[dict]) -> list[str]:
+    """Замечания к описанию источника; пустой список — описание принято.
+
+    Проверка не трогает поисковый индекс: сверку описания с имеющимся полным текстом
+    (`search.text_file`) делает фасад `sources/lit.py`, который стоит правее реестра.
+    """
+    notes, codes = [], {other['code'] for other in rows}
+    if about.get('kind') not in KINDS:
+        notes.append(f"kind: одно из {', '.join(KINDS)}")
+    if about.get('basis') not in BASES:
+        notes.append(f"basis: одно из «{'», «'.join(BASES)}»")
+    try:
+        date.fromisoformat(about.get('date') or '')
+    except (TypeError, ValueError):
+        notes.append('date: дата в виде ГГГГ-ММ-ДД')
+    if len(web.squash(about.get('object'))) < 60:
+        notes.append('object: что изучается — оператор, пространство, краевые условия, класс данных; от 60 знаков')
+    lists = {key: about.get(key) or [] for key in ('results', 'methods', 'related', 'keywords')}
+    for key, value in lists.items():
+        if not isinstance(value, list) or not all(isinstance(item, str) and item.strip() for item in value):
+            notes.append(f'{key}: список непустых строк')
+            lists[key] = []
+    read = about.get('basis') in BASES[:2]
+    if read and not lists['results']:
+        notes.append('results: главные утверждения с номером и страницей, если они есть в тексте')
+    if read and not lists['methods']:
+        notes.append('methods: чем доказано, по одному методу в строке')
+    if len(lists['keywords']) < 3:
+        notes.append('keywords: не меньше трёх; фамилии и термины по-русски и по-английски')
+    for item in lists['related']:
+        match = re.match(r'(S\d+)\b', item)
+        if not match or match.group(1) not in codes or match.group(1) == row['code']:
+            notes.append(f'related: строка начинается с кода другого источника реестра — «{item[:40]}»')
+    whole = ' '.join([about.get('object') or ''] + [item for value in lists.values() for item in value])
+    if UNFINISHED.search(whole):
+        notes.append('описание содержит отложенную проверку: запиши прочитанное, а не план чтения')
+    for other in rows:
+        if other['code'] != row['code'] \
+                and web.squash((other.get('about') or {}).get('object')) == web.squash(about.get('object')):
+            notes.append(f"object дословно совпадает с {other['code']}")
+    return notes
 
 
 def arxiv_id(row: dict) -> str | None:

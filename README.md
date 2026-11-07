@@ -8,8 +8,9 @@
 
 Набор для исследовательского проекта, который ведут агенты Claude Code или DeepSeek
 Harness: постановка, источники, идеи с независимой критикой, доказательства с рецензией,
-формализация в Lean 4 с проверкой соответствия, статья. От темы шаблон не зависит: всё
-тематическое живёт в двух файлах нового проекта, `question.md` и `PROJECT.md`.
+формализация в Lean 4 с проверкой соответствия, статья и независимые экспозиции. От темы
+шаблон не зависит: всё тематическое живёт в двух файлах нового проекта, `question.md` и
+`PROJECT.md`.
 
 Порядок работы и возможности для нового пользователя — в [docs/howto/guide.md](docs/howto/guide.md).
 Как устроен сам набор — в [docs/concept/architecture.md](docs/concept/architecture.md).
@@ -44,8 +45,9 @@ python tools/create.py --update ..\Spectra
 
 Обновление переписывает только то, чем владеет шаблон: `AGENTS.md`, `CLAUDE.md`,
 `scripts/`, `tests/`, `.claude/agents/`, `.claude/commands/`, `.claude/skills/`,
-`DEEPSEEK.md`, `sources/README.md`, `experiments/README.md`, CI. Постановка, записи, идеи,
-источники, библиотека Lean, статья, `.mcp.json` и `.claude/settings.json` не трогаются.
+`DEEPSEEK.md`, `sources/README.md`, `experiments/README.md`, CI и шаблон экспозиции
+`paper/exposition-template.tex`. Постановка, записи, идеи, источники, библиотека Lean,
+статья, `.mcp.json` и `.claude/settings.json` не трогаются.
 Файлы, которых в шаблоне больше нет, команда перечисляет, но не удаляет. Если в проекте
 лежит навык с именем команды шаблона, обновление останавливается и называет папку
 `.claude/skills/ИМЯ/`, которую нужно удалить: команды и навыки делят одно пространство имён.
@@ -98,13 +100,13 @@ Python 3.11 или новее, `uv`, `elan` с `lake`, `git`; `pdflatex` — д�
 | Часть | Содержание |
 | --- | --- |
 | `template/AGENTS.md` | общие правила: карта проекта, статусы, роли агентов, проверки |
-| `template/scripts/state/proj.py` | заготовки записей, поля шапок, сводки, проверки, аудит аксиом, отпечатки формулировок, сборка статьи, пакеты Aristotle |
+| `template/scripts/state/proj.py` | заготовки записей, поля шапок, сводки и `paper/generated/status.tex`, проверки, аудит аксиом, отпечатки формулировок, сборка статьи и экспозиций, реестр аксиом итоговых теорем, пакеты Aristotle |
 | `template/scripts/records.py` | один разбор записей с шапкой для `proj.py` и `lit.py`: чтение, запись, номера, заготовки |
-| `template/scripts/sources/lit.py` | источники: zbMATH, arXiv, MathNet, DOI; транскрипции; гибридный поиск по полным текстам |
+| `template/scripts/sources/lit.py` | источники: zbMATH, arXiv, Crossref, OpenAlex, Semantic Scholar, MathNet, DOI; описания и их проверка; транскрипции; гибридный поиск по полным текстам |
 | `template/scripts/state/mcp.py и scripts/sources/mcp.py` | те же действия как инструменты MCP-серверов `proj` и `lit` |
 | `template/scripts/host/harness.py` | DeepSeek Harness: skills, роли и MCP из `.claude/` и `.mcp.json`, Cordis patch, запуск Web/Headless |
 | `template/DEEPSEEK.md` | запуск Harness, перенос воркфлоу Claude Code, проверки |
-| `template/.claude/agents/` | генератор идей, критик, экспериментатор, рецензент, формализатор, проверяющий соответствие, поиск по Mathlib, поиск литературы, транскрипция PDF, сверка карточек |
+| `template/.claude/agents/` | генератор идей, критик, доказательство по идее (`prover`), экспериментатор, рецензент, формализатор, проверяющий соответствие, поиск по Mathlib, поиск литературы, транскрипция PDF, сверка карточек |
 | `template/.claude/commands/` | `/day`, `/ideas`, `/referee`, `/formalize`, `/fidelity`, `/sources`, `/transcribe`, `/exposition` |
 | `template/.claude/skills/` | слои математического текста: содержание — `math-rigor`, композиция — `paper-canvas`, стиль автора — `shkalikov-style`, язык — `paper-de-ai`, набор — `math-typeset` |
 | `tests/template/` | тесты инструментов без сети и без Lean; `harness_runtime.mjs` сверяет patch со схемами Harness |

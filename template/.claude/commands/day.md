@@ -37,10 +37,10 @@ description: Ежедневный цикл — состояние, идеи с �
 
 ## 4. Работа над целью
 
-- **Доказательство.** Создай запись: `python scripts/state/proj.py new result "Название"
-  --depends R03,R05`. Запиши утверждение, полное доказательство и границы; поставь статус
-  `доказано`; идее поставь статус `перенесена` и поле `result`. Затем выполни шаги
-  команды `/referee`.
+- **Доказательство.** Запусти роль `prover`: путь к идее и решения пользователя о внешних
+  входах. Роль создаёт запись `results/R*.md`. Проверь шапку по полям шаблона и поставь
+  `status: доказано` (`python scripts/state/proj.py set R07 status доказано`); идее поставь
+  `status: перенесена` и `result: R07`. Затем выполни шаги команды `/referee`.
 - **Формализация.** Шаги команды `/formalize`.
 - **Источник.** Шаг 4 команды `/sources`.
 
@@ -58,8 +58,10 @@ description: Ежедневный цикл — состояние, идеи с �
 
 ## 6. Завершение
 
-1. `python scripts/state/proj.py sync`, `python scripts/state/proj.py check`. Если менялись файлы в
-   `scripts/`, ещё `python -m unittest discover tests`.
+1. `python scripts/state/proj.py sync` (собирает `blueprint.md`, `ideas/README.md`,
+   `sources/catalog.md` и `paper/generated/status.tex`), затем
+   `python scripts/state/proj.py check`. Если менялись файлы в `scripts/`, ещё
+   `python -m unittest discover tests`.
 2. Раздел «Ответ на …» в `question.md` обнови, если изменился ответ на вопрос. Статусы в
    нём не повторяются.
 3. Если результат дня меняет ответ статьи, напиши в отчёте, что пора запустить

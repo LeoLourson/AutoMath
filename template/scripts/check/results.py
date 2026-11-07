@@ -42,6 +42,8 @@ def check_records(root: Path, records_: list, sources: set[str], carded: set[str
         names = doc.many('lean')
         missing = [name for name in names if declarations.resolve(index, name) is None]
         errors += [f'{where}: объявления {name} нет в библиотеке' for name in missing]
+        if meta.get('final') == 'true' and not names:
+            errors.append(f'{where}: final: true требует поля lean с итоговой теоремой')
         if names and not missing:
             stored = (meta.get('fidelity') or '').split()
             if not stored:

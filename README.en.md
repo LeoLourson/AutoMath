@@ -8,7 +8,7 @@
 
 A kit for a research project carried by Claude Code or DeepSeek Harness agents: the problem
 statement, sources, ideas with independent critique, proofs with refereeing, formalization in
-Lean 4 with fidelity checks, and a paper. The kit does not depend on the topic: everything
+Lean 4 with fidelity checks, a paper, and independent expositions. The kit does not depend on the topic: everything
 topical lives in two files of a new project, `question.md` and `PROJECT.md`.
 
 The working order and what a new user can do — in [docs/howto/guide.md](docs/howto/guide.md)
@@ -45,7 +45,8 @@ python tools/create.py --update ..\Spectra
 
 The update rewrites only what the template owns: `AGENTS.md`, `CLAUDE.md`, `scripts/`, `tests/`,
 `.claude/agents/`, `.claude/commands/`, `.claude/skills/`, `DEEPSEEK.md`, `sources/README.md`,
-`experiments/README.md`, CI. The problem statement, records, ideas, sources, the Lean library,
+`experiments/README.md`, CI, and the exposition template `paper/exposition-template.tex`. The
+problem statement, records, ideas, sources, the Lean library,
 the paper, `.mcp.json`, and `.claude/settings.json` are not touched. Files that are no longer in
 the template are listed, not deleted. If the project has a skill named like a template command,
 the update stops and names the `.claude/skills/NAME/` folder to delete: commands and skills share
@@ -99,13 +100,13 @@ their dependencies themselves.
 | Part | Contents |
 | --- | --- |
 | `template/AGENTS.md` | the common rules: the project map, statuses, agent roles, checks |
-| `template/scripts/state/proj.py` | record stubs, header fields, summaries, checks, the axiom audit, statement fingerprints, the paper build, the Aristotle packages |
+| `template/scripts/state/proj.py` | record stubs, header fields, summaries and `paper/generated/status.tex`, checks, the axiom audit, statement fingerprints, the paper and exposition build, the axiom registry of final theorems, the Aristotle packages |
 | `template/scripts/records.py` | one parser of headered records for `proj.py` and `lit.py`: reading, writing, numbering, stubs |
-| `template/scripts/sources/lit.py` | sources: zbMATH, arXiv, MathNet, DOI; transcriptions; hybrid search over full texts |
+| `template/scripts/sources/lit.py` | sources: zbMATH, arXiv, Crossref, OpenAlex, Semantic Scholar, MathNet, DOI; descriptions and their audit; transcriptions; hybrid search over full texts |
 | `template/scripts/state/mcp.py` and `scripts/sources/mcp.py` | the same actions as the MCP servers `proj` and `lit` |
 | `template/scripts/host/harness.py` | DeepSeek Harness: skills, roles and MCP from `.claude/` and `.mcp.json`, the Cordis patch, Web/Headless launch |
 | `template/DEEPSEEK.md` | running the Harness, carrying over the Claude Code workflow, checks |
-| `template/.claude/agents/` | idea generator, critic, experimenter, referee, formalizer, fidelity checker, Mathlib scout, literature scout, PDF transcriber, card verifier |
+| `template/.claude/agents/` | idea generator, critic, prover (turns a surviving idea into a record), experimenter, referee, formalizer, fidelity checker, Mathlib scout, literature scout, PDF transcriber, card verifier |
 | `template/.claude/commands/` | `/day`, `/ideas`, `/referee`, `/formalize`, `/fidelity`, `/sources`, `/transcribe`, `/exposition` |
 | `template/.claude/skills/` | the layers of a mathematical text: content — `math-rigor`, composition — `paper-canvas`, the author's style — `shkalikov-style`, language — `paper-de-ai`, typesetting — `math-typeset` |
 | `tests/template/` | tests of the tools without the network and Lean; `harness_runtime.mjs` checks the patch against the Harness schemas |

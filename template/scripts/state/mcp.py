@@ -59,8 +59,15 @@ def set_field(id: str, key: str, value: str) -> str:
 
 @tool
 def sync() -> str:
-    """Пересобирает blueprint.md, ideas/README.md и каталог источников из шапок записей."""
+    """Пересобирает blueprint.md, ideas/README.md, paper/generated/status.tex и каталог источников."""
     return '\n'.join(proj.sync())
+
+
+@tool
+def ledger() -> str:
+    """Собирает output/generated/Axioms.lean из записей final: true — реестр аксиом итоговых теорем."""
+    proj.ledger()
+    return 'output/generated/Axioms.lean собран.'
 
 
 @tool

@@ -29,7 +29,7 @@ PROJECT_DOCS = (TEMPLATE / 'README.md', TEMPLATE / 'AGENTS.md', TEMPLATE / 'DEEP
 # Появляются при работе: сводки собирает proj.py sync, каталог — lit.py, записи и опыты
 # создают команды. Их в заготовке нет по замыслу.
 GENERATED = {'blueprint.md', 'ideas/README.md', 'sources/catalog.md', 'results/R01.md',
-             'experiments/E01/run.py'}
+             'experiments/E01/run.py', 'paper/generated/status.tex'}
 # Названы в собственной раскладке: у навыка свои scripts/ и reference/, а `harness_runtime.mjs`
 # в наборе лежит вне заготовки.
 OWN_LAYOUT = {'scripts/check_fragment.py', 'tests/template/harness_runtime.mjs'}
@@ -73,6 +73,8 @@ class DocumentationMatchesWorkflow(unittest.TestCase):
                     continue
                 if any(part.isupper() for part in named.replace('.', '/').split('/')):
                     continue  # ЗАГЛАВНЫМИ пишут подстановку: `NAME` в таблице соответствия
+                if 'ИМЯ' in named:
+                    continue  # подстановка имени экспозиции: `paper/exposition-ИМЯ.tex`
                 if not named.rsplit('/', 1)[-1].endswith(('.md', '.py', '.json', '.toml',
                                                           '.yml', '.mjs', '.lean', '.tex')):
                     continue
